@@ -21,6 +21,37 @@ fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                 try l.append(0);
             }
         },
+        .Array => {
+            // [N]bitvector or [N]vector?
+            switch (@typeInfo(info.Array.child)) {
+                .Bool => {
+                    var byte: u8 = 0;
+                    for (data) |bit, index| {
+                        if (bit) {
+                            byte |= @as(u8, 1) << @truncate(u3, index);
+                        }
+
+                        if (index % 8 == 7) {
+                            try l.append(byte);
+                            byte = 0;
+                        }
+                    }
+
+                    // Write the last byte if the length
+                    // is not byte-aligned
+                    if (data.len % 8 != 0) {
+                        try l.append(byte);
+                    }
+                },
+                else => {
+                    return error.UnknownType;
+
+                    for (data) |item| {
+                        try serialize(info.Array.child, item, l);
+                    }
+                },
+            }
+        },
         else => {
             return error.UnknownType;
         },
@@ -78,4 +109,33 @@ test "serializes bool" {
     defer list2.deinit();
     try serialize(bool, data, &list2);
     expect(std.mem.eql(u8, list2.items, exp));
+}
+
+test "serializes [N]bitvector == [N]bool" {
+    var data7 = [_]bool{ true, false, true, true, false, false, false };
+    var serialized_data = [_]u8{0b00001101};
+    var exp = serialized_data[0..serialized_data.len];
+
+    var list7 = ArrayList(u8).init(std.testing.allocator);
+    defer list7.deinit();
+    try serialize([7]bool, data7, &list7);
+    expect(std.mem.eql(u8, list7.items, exp));
+
+    var data8 = [_]bool{ true, false, true, true, false, false, false, true };
+    serialized_data = [_]u8{0b10001101};
+    exp = serialized_data[0..serialized_data.len];
+
+    var list8 = ArrayList(u8).init(std.testing.allocator);
+    defer list8.deinit();
+    try serialize([8]bool, data8, &list8);
+    expect(std.mem.eql(u8, list8.items, exp));
+
+    var data12 = [_]bool{ true, false, true, true, false, false, false, true, false, true, false, true };
+
+    var list12 = ArrayList(u8).init(std.testing.allocator);
+    defer list12.deinit();
+    try serialize([12]bool, data12, &list12);
+    expect(list12.items.len == 2);
+    expect(list12.items[0] == 141);
+    expect(list12.items[1] == 10);
 }
