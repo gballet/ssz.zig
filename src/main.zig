@@ -22,7 +22,7 @@ fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
             }
         },
         .Array => {
-            // [N]bitvector or [N]vector?
+            // Bitvector[N] or vector?
             switch (@typeInfo(info.Array.child)) {
                 .Bool => {
                     var byte: u8 = 0;
@@ -111,7 +111,7 @@ test "serializes bool" {
     expect(std.mem.eql(u8, list2.items, exp));
 }
 
-test "serializes [N]bitvector == [N]bool" {
+test "serializes Bitvector[N] == [N]bool" {
     var data7 = [_]bool{ true, false, true, true, false, false, false };
     var serialized_data = [_]u8{0b00001101};
     var exp = serialized_data[0..serialized_data.len];
