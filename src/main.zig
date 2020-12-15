@@ -52,6 +52,20 @@ fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                 },
             }
         },
+        .Struct => {
+            // Second pass: intertwine fixed fields and variables offsets
+            comptime var var_acc = 0; // variable part size accumulator
+            inline for (info.Struct.fields) |field| {
+                switch (@typeInfo(field.field_type)) {
+                    .Int, .Bool => {
+                        try serialize(field.field_type, @field(data, field.name), l);
+                    },
+                    else => {
+                        return error.UnknownType;
+                    },
+                }
+            }
+        },
         else => {
             return error.UnknownType;
         },
@@ -138,4 +152,19 @@ test "serializes Bitvector[N] == [N]bool" {
     expect(list12.items.len == 2);
     expect(list12.items[0] == 141);
     expect(list12.items[1] == 10);
+}
+
+test "serializes structure without variable parts" {
+    var data = .{
+        .uint8 = @as(u8, 1),
+        .uint32 = @as(u32, 3),
+        .boolean = true,
+    };
+    const serialized_data = [_]u8{ 1, 3, 0, 0, 0, 1 };
+    const exp = serialized_data[0..serialized_data.len];
+
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    try serialize(@TypeOf(data), data, &list);
+    expect(std.mem.eql(u8, list.items, exp));
 }
