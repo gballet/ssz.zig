@@ -1,3 +1,6 @@
+//! This module provides functions for serializing and deserializing
+//! data structures with the SSZ method.
+
 const std = @import("std");
 const ArrayList = std.ArrayList;
 const expect = std.testing.expect;
@@ -5,11 +8,8 @@ const builtin = std.builtin;
 
 fn serialized_size(comptime T: type, data: T) !usize {
     const info = @typeInfo(T);
-    std.debug.print("{}\n", .{data.len});
     switch (info) {
-        .Array => {
-            return data.len;
-        },
+        .Array => return data.len,
         .Pointer => {
             return serialized_size(info.Pointer.child, data.*);
         },
@@ -243,7 +243,7 @@ test "serializes an array of shorts" {
     expect(std.mem.eql(u8, list.items, expected));
 }
 
-test "serializes structure without variable parts" {
+test "serializes a structure without variable fields" {
     var data = .{
         .uint8 = @as(u8, 1),
         .uint32 = @as(u32, 3),
@@ -258,7 +258,7 @@ test "serializes structure without variable parts" {
     expect(std.mem.eql(u8, list.items, exp));
 }
 
-test "serializes structure with variable parts" {
+test "serializes a structure with variable fields" {
     // Taken from ssz.cr
     const data = .{
         .name = "James",
