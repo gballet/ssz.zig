@@ -73,6 +73,21 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                 },
             }
         },
+        .Pointer => {
+            // Bitlist[N] or list?
+            switch (info.Pointer.size) {
+                .Slice, .One => {
+                    if (@sizeOf(info.Pointer.child) == 1) {
+                        _ = try l.writer().write(data);
+                    } else {
+                        for (data) |item| {
+                            try serialize(@TypeOf(item), item, l);
+                        }
+                    }
+                },
+                else => return error.UnSupportedPointerType,
+            }
+        },
         .Struct => {
             // First pass, accumulate the fixed sizes
             comptime var var_start = 0;
@@ -198,6 +213,26 @@ test "serializes Bitvector[N] == [N]bool" {
     expect(list12.items.len == 2);
     expect(list12.items[0] == 141);
     expect(list12.items[1] == 10);
+}
+
+test "serializes string" {
+    const data = "zig zag";
+
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    try serialize([]const u8, data, &list);
+    expect(std.mem.eql(u8, list.items, data));
+}
+
+test "serializes an array of shorts" {
+    const data = [_]u16{ 0xabcd, 0xef01 };
+    const serialized = [_]u8{ 0xcd, 0xab, 0x01, 0xef };
+    const expected = serialized[0..serialized.len];
+
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    try serialize([]const u16, data[0..data.len], &list);
+    expect(std.mem.eql(u8, list.items, expected));
 }
 
 test "serializes structure without variable parts" {
