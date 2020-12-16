@@ -7,3 +7,4 @@ Currently supported types:
  * `BitVector[N]`
  * `uintN`
  * `boolean`
+ * structures

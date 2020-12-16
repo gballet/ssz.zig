@@ -3,6 +3,22 @@ const ArrayList = std.ArrayList;
 const expect = std.testing.expect;
 const builtin = std.builtin;
 
+fn serialized_size(comptime T: type, data: T) !usize {
+    const info = @typeInfo(T);
+    std.debug.print("{}\n", .{data.len});
+    switch (info) {
+        .Array => {
+            return data.len;
+        },
+        .Pointer => {
+            return serialized_size(info.Pointer.child, data.*);
+        },
+        else => {
+            return error.NoSerializedSizeAvailable;
+        },
+    }
+}
+
 /// Provides the generic serialization of any `data` var to SSZ. The
 /// serialization is written to the `ArrayList` `l`.
 pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
@@ -55,16 +71,41 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
             }
         },
         .Struct => {
+            // First pass, accumulate the fixed sizes
+            comptime var var_start = 0;
+            inline for (info.Struct.fields) |field| {
+                if (@typeInfo(field.field_type) == .Int or @typeInfo(field.field_type) == .Bool) {
+                    var_start += @sizeOf(field.field_type);
+                } else {
+                    var_start += 4;
+                }
+            }
+
             // Second pass: intertwine fixed fields and variables offsets
-            comptime var var_acc = 0; // variable part size accumulator
+            var var_acc = @as(usize, var_start); // variable part size accumulator
             inline for (info.Struct.fields) |field| {
                 switch (@typeInfo(field.field_type)) {
                     .Int, .Bool => {
                         try serialize(field.field_type, @field(data, field.name), l);
                     },
                     else => {
-                        return error.UnknownType;
+                        try serialize(u32, @truncate(u32, var_acc), l);
+                        var_acc += try serialized_size(field.field_type, @field(data, field.name));
                     },
+                }
+            }
+
+            // Third pass: add variable fields at the end
+            if (var_acc > var_start) {
+                inline for (info.Struct.fields) |field| {
+                    switch (@typeInfo(field.field_type)) {
+                        .Int, .Bool => {
+                            // skip fixed-size fields
+                        },
+                        else => {
+                            try serialize(field.field_type, @field(data, field.name), l);
+                        },
+                    }
                 }
             }
         },
@@ -163,6 +204,22 @@ test "serializes structure without variable parts" {
         .boolean = true,
     };
     const serialized_data = [_]u8{ 1, 3, 0, 0, 0, 1 };
+    const exp = serialized_data[0..serialized_data.len];
+
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    try serialize(@TypeOf(data), data, &list);
+    expect(std.mem.eql(u8, list.items, exp));
+}
+
+test "serializes structure with variable parts" {
+    // Taken from ssz.cr
+    const data = .{
+        .name = "James",
+        .age = @as(u8, 32),
+        .company = "DEV Inc.",
+    };
+    const serialized_data = [_]u8{ 9, 0, 0, 0, 32, 14, 0, 0, 0, 74, 97, 109, 101, 115, 68, 69, 86, 32, 73, 110, 99, 46 };
     const exp = serialized_data[0..serialized_data.len];
 
     var list = ArrayList(u8).init(std.testing.allocator);
