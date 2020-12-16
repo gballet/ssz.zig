@@ -26,11 +26,14 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
     switch (info) {
         .Int => {
             const N = @sizeOf(T);
-                    comptime var i: usize = 0;
-                    inline while (i < N) : (i += 1) {
-                        const byte: u8 = @truncate(u8, data >> (8 * i));
-                        try l.append(byte);
-                    }
+            comptime var i: usize = 0;
+            inline while (i < N) : (i += 1) {
+                const byte: u8 = switch (builtin.endian) {
+                    .Big => @truncate(u8, data >> (8 * (N - i))),
+                    .Little => @truncate(u8, data >> (8 * i)),
+                };
+                try l.append(byte);
+            }
         },
         .Bool => {
             if (data) {
