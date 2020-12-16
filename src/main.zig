@@ -11,7 +11,14 @@ fn serialized_size(comptime T: type, data: T) !usize {
     switch (info) {
         .Array => return data.len,
         .Pointer => {
-            return serialized_size(info.Pointer.child, data.*);
+            switch (info.Pointer.size) {
+                .Slice => {
+                    return data.len;
+                },
+                else => {
+                    return serialized_size(info.Pointer.child, data.*);
+                },
+            }
         },
         .Optional => if (data == null)
             return @as(usize, 0)
