@@ -13,6 +13,10 @@ fn serialized_size(comptime T: type, data: T) !usize {
         .Pointer => {
             return serialized_size(info.Pointer.child, data.*);
         },
+        .Optional => if (data == null)
+            return @as(usize, 0)
+        else
+            return serialized_size(info.Optional.child, data.?),
         else => {
             return error.NoSerializedSizeAvailable;
         },
@@ -130,6 +134,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
         .Null => {
             // Nothing to be added
         },
+        .Optional => if (data != null) try serialize(info.Optional.child, data.?, l),
         else => {
             return error.UnknownType;
         },
@@ -267,4 +272,33 @@ test "serializes structure with variable parts" {
     defer list.deinit();
     try serialize(@TypeOf(data), data, &list);
     expect(std.mem.eql(u8, list.items, exp));
+}
+
+test "serializes a structure with optional fields" {
+    const Employee = struct {
+        name: ?[]const u8,
+        age: u8,
+        company: ?[]const u8,
+    };
+    const data: Employee = .{
+        .name = "James",
+        .age = @as(u8, 32),
+        .company = null,
+    };
+
+    const serialized_data = [_]u8{ 9, 0, 0, 0, 32, 14, 0, 0, 0, 74, 97, 109, 101, 115 };
+    const exp = serialized_data[0..serialized_data.len];
+
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    try serialize(@TypeOf(data), data, &list);
+    expect(std.mem.eql(u8, list.items, exp));
+}
+
+test "serializes an optional object" {
+    const null_or_string: ?[]const u8 = null;
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    try serialize(@TypeOf(null_or_string), null_or_string, &list);
+    expect(list.items.len == 0);
 }
