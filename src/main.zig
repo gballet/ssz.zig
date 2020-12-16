@@ -127,6 +127,9 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                 }
             }
         },
+        .Null => {
+            // Nothing to be added
+        },
         else => {
             return error.UnknownType;
         },
