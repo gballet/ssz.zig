@@ -3,7 +3,9 @@ const ArrayList = std.ArrayList;
 const expect = std.testing.expect;
 const builtin = std.builtin;
 
-fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
+/// Provides the generic serialization of any `data` var to SSZ. The
+/// serialization is written to the `ArrayList` `l`.
+pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
     const info = @typeInfo(T);
     switch (info) {
         .Int => {
