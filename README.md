@@ -11,6 +11,7 @@ Currently supported types:
  * `uintN`
  * `boolean`
  * structures
+ * optionals
 
 ## Deserialization
 

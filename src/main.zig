@@ -8,26 +8,18 @@ const builtin = std.builtin;
 
 fn serialized_size(comptime T: type, data: T) !usize {
     const info = @typeInfo(T);
-    switch (info) {
-        .Array => return data.len,
-        .Pointer => {
-            switch (info.Pointer.size) {
-                .Slice => {
-                    return data.len;
-                },
-                else => {
-                    return serialized_size(info.Pointer.child, data.*);
-                },
-            }
+    return switch (info) {
+        .Array => data.len,
+        .Pointer => switch (info.Pointer.size) {
+            .Slice => data.len,
+            else => serialized_size(info.Pointer.child, data.*),
         },
         .Optional => if (data == null)
-            return @as(usize, 0)
+            @as(usize, 0)
         else
-            return serialized_size(info.Optional.child, data.?),
-        else => {
-            return error.NoSerializedSizeAvailable;
-        },
-    }
+            serialized_size(info.Optional.child, data.?),
+        else => error.NoSerializedSizeAvailable,
+    };
 }
 
 /// Provides the generic serialization of any `data` var to SSZ. The
