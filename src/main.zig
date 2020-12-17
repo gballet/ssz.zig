@@ -309,3 +309,41 @@ test "serializes an optional object" {
     try serialize(@TypeOf(null_or_string), null_or_string, &list);
     expect(list.items.len == 0);
 }
+
+pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
+    const info = @typeInfo(T);
+    switch (info) {
+        .Int => {
+            const N = @sizeOf(T);
+            comptime var i: usize = 0;
+            out.* = @as(T, 0);
+            inline while (i < N) : (i += 1) {
+                // if the integer takes more than one byte, then
+                // shift the result by one byte and OR the next
+                // byte in the sequence.
+                if (@sizeOf(T) > 1) {
+                    out.* <<= 8;
+                }
+                out.* |= switch (builtin.endian) {
+                    .Big => @as(T, serialized[i]),
+                    .Little => @as(T, serialized[N - i - 1]),
+                };
+            }
+        },
+        else => return error.NotImplemented,
+    }
+}
+
+test "deserializes u8" {
+    const payload = [_]u8{0x55};
+    var i: u8 = 0;
+    try deserialize(u8, payload[0..payload.len], &i);
+    expect(i == 0x55);
+}
+
+test "deserializes u32" {
+    const payload = [_]u8{ 0x55, 0x66, 0x77, 0x88 };
+    var i: u32 = 0;
+    try deserialize(u32, payload[0..payload.len], &i);
+    expect(i == 0x88776655);
+}
