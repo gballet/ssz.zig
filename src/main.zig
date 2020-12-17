@@ -32,7 +32,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
             comptime var i: usize = 0;
             inline while (i < N) : (i += 1) {
                 const byte: u8 = switch (builtin.endian) {
-                    .Big => @truncate(u8, data >> (8 * (N - i))),
+                    .Big => @truncate(u8, data >> (8 * (N - i - 1))),
                     .Little => @truncate(u8, data >> (8 * i)),
                 };
                 try l.append(byte);
