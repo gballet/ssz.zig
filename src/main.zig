@@ -322,20 +322,32 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                 };
             }
         },
+        .Bool => out.* = (serialized[0] == 1),
         else => return error.NotImplemented,
     }
 }
 
-test "deserializes u8" {
+test "deserializes an u8" {
     const payload = [_]u8{0x55};
     var i: u8 = 0;
     try deserialize(u8, payload[0..payload.len], &i);
     expect(i == 0x55);
 }
 
-test "deserializes u32" {
+test "deserializes an u32" {
     const payload = [_]u8{ 0x55, 0x66, 0x77, 0x88 };
     var i: u32 = 0;
     try deserialize(u32, payload[0..payload.len], &i);
     expect(i == 0x88776655);
+}
+
+test "deserializes a boolean" {
+    const payload_false = [_]u8{0};
+    var b = true;
+    try deserialize(bool, payload_false[0..1], &b);
+    expect(b == false);
+
+    const payload_true = [_]u8{1};
+    try deserialize(bool, payload_true[0..1], &b);
+    expect(b == true);
 }
