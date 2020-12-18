@@ -323,6 +323,22 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
             }
         },
         .Bool => out.* = (serialized[0] == 1),
+        .Struct => {
+            comptime var i = 0;
+            inline for (info.Struct.fields) |field,field_index| {
+                // First pass, read the value of each fixed-size field,
+                switch (@typeInfo(field.field_type)) {
+                    .Bool, .Int => {
+                        // Direct deserialize
+                        try deserialize(field.field_type, serialized[i..i+@sizeOf(field.field_type)], &@field(out.*, field.name));
+                        i += @sizeOf(field.field_type);
+                    },
+                    else => { 
+                        i += 4;
+                    },
+                }
+            }
+        },
         else => return error.NotImplemented,
     }
 }
@@ -350,4 +366,24 @@ test "deserializes a boolean" {
     const payload_true = [_]u8{1};
     try deserialize(bool, payload_true[0..1], &b);
     expect(b == true);
+}
+
+test "deserializes a structure" {
+    const Pastry = struct {
+        name : []const u8,
+        weight : u16,
+    };
+
+    var croissant = Pastry {
+        .name = "croissant",
+        .weight = 20,
+    };
+    var out = Pastry { .name = "", .weight = 0};
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+
+    try serialize(Pastry, croissant, &list);
+    try deserialize(Pastry, list.items, &out);
+
+    expect(croissant.weight == out.weight);
 }

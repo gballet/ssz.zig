@@ -18,6 +18,8 @@ Currently supported types:
 Supported types:
 
  * `uintN`
+ * `boolean`
+ * fixed-size structures
 
 ## Merkelization
 
