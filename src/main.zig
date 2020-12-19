@@ -323,6 +323,10 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
             }
         },
         .Bool => out.* = (serialized[0] == 1),
+        .Pointer => {
+            // TODO allocate and copy the data.
+            out.* = serialized[0..serialized.len];
+        },
         .Struct => {
             comptime var i = 0;
             inline for (info.Struct.fields) |field,field_index| {
@@ -366,6 +370,19 @@ test "deserializes a boolean" {
     const payload_true = [_]u8{1};
     try deserialize(bool, payload_true[0..1], &b);
     expect(b == true);
+}
+
+test "deserializes a string" {
+    const exp = "croissants";
+    
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    const serialized = try serialize([]const u8, exp, &list);
+
+    var got : []const u8 = undefined;
+
+    try deserialize([]const u8, list.items, &got);
+    expect(std.mem.eql(u8, exp, got));
 }
 
 test "deserializes a structure" {
