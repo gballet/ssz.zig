@@ -328,9 +328,25 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
             out.* = serialized[0..serialized.len];
         },
         .Struct => {
+            // Calculate the number of variable fields in the
+            // struct.
+            comptime var n_var_fields = 0;
+             comptime {
+                for (info.Struct.fields) |field| {
+                    switch (@typeInfo(field.field_type)) {
+                        .Int, .Bool => {},
+                        else =>n_var_fields += 1,
+                    }
+                }
+            }
+
+            var indices : [n_var_fields]u32 = undefined;
+
+            // First pass, read the value of each fixed-size field,
+            // and write down the start offset of each variable-sized
+            // field.
             comptime var i = 0;
             inline for (info.Struct.fields) |field,field_index| {
-                // First pass, read the value of each fixed-size field,
                 switch (@typeInfo(field.field_type)) {
                     .Bool, .Int => {
                         // Direct deserialize
@@ -338,8 +354,23 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                         i += @sizeOf(field.field_type);
                     },
                     else => { 
+                        try deserialize(u32, serialized[i..i+4], &indices[field_index]);
                         i += 4;
                     },
+                }
+            }
+
+            // Second pass, deserialize each variable-sized value
+            // now that their offset is known.
+            comptime var last_index = 0;
+            inline for (info.Struct.fields) |field| {
+                switch (@typeInfo(field.field_type)) {
+                    .Bool, .Int => {},  // covered by the previous pass
+                    else => {
+                        const end = if (last_index == indices.len-1) serialized.len else indices[last_index+1];
+                        try deserialize(field.field_type, serialized[indices[last_index]..end], &@field(out.*, field.name));
+                        last_index += 1;
+                    }
                 }
             }
         },
@@ -403,4 +434,5 @@ test "deserializes a structure" {
     try deserialize(Pastry, list.items, &out);
 
     expect(croissant.weight == out.weight);
+    expect(std.mem.eql(u8, croissant.name, out.name));
 }

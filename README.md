@@ -19,7 +19,7 @@ Supported types:
 
  * `uintN`
  * `boolean`
- * fixed-size structures
+ * structures
  * strings
 
 ## Merkelization
