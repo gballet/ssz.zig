@@ -21,6 +21,7 @@ Supported types:
  * `boolean`
  * structures
  * strings
+ * `BitVector[N]`
 
 ## Merkelization
 

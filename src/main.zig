@@ -323,6 +323,23 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
             }
         },
         .Bool => out.* = (serialized[0] == 1),
+        .Array => {
+            // Bitvector[N] or regular vector?
+            switch (@typeInfo(info.Array.child)) {
+                .Bool => {
+                    for (serialized) |byte, bindex| {
+                        var i = @as(u8, 0);
+                        var b = byte;
+                        while (bindex * 8 + i < out.len and i < 8) : (i += 1) {
+                            out[bindex * 8 + i] = b & 1 == 1;
+                            b >>= 1;
+                        }
+                    }
+                },
+                else => {
+                },
+            }
+        },
         .Pointer => {
             // TODO allocate and copy the data.
             out.* = serialized[0..serialized.len];
@@ -401,6 +418,17 @@ test "deserializes a boolean" {
     const payload_true = [_]u8{1};
     try deserialize(bool, payload_true[0..1], &b);
     expect(b == true);
+}
+
+test "deserializes a Bitvector[N]" {
+    const exp = [_]bool{ true, false, true, true, false, false, false };
+    var out = [_]bool{false, false, false, false, false, false, false};
+    const serialized_data = [_]u8{0b00001101};
+    try deserialize([7]bool, serialized_data[0..1], &out);
+    comptime var i = 0;
+    inline while (i<7) : (i += 1) {
+        expect(out[i] == exp[i]);
+    }
 }
 
 test "deserializes a string" {
