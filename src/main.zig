@@ -444,23 +444,43 @@ test "deserializes a string" {
     expect(std.mem.eql(u8, exp, got));
 }
 
-test "deserializes a structure" {
-    const Pastry = struct {
-        name : []const u8,
-        weight : u16,
-    };
+const Pastry = struct {
+    name : []const u8,
+    weight : u16,
+};
 
-    var croissant = Pastry {
+const pastries = [_]Pastry{
+    Pastry{
         .name = "croissant",
-        .weight = 20,
-    };
+        .weight = 20
+    },
+    Pastry{
+        .name = "Herrentorte",
+        .weight = 500,
+    },
+};
+
+test "deserializes a structure" {
     var out = Pastry { .name = "", .weight = 0};
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
 
-    try serialize(Pastry, croissant, &list);
+    try serialize(Pastry, pastries[0], &list);
     try deserialize(Pastry, list.items, &out);
 
-    expect(croissant.weight == out.weight);
-    expect(std.mem.eql(u8, croissant.name, out.name));
+    expect(pastries[0].weight == out.weight);
+    expect(std.mem.eql(u8, pastries[0].name, out.name));
+}
+
+test "deserializes a Vector[N]" {
+    var out : [2]Pastry = undefined;
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+
+    const serialized_data = try serialize([2]Pastry, pastries, &list);
+    try deserialize(@TypeOf(pastries), list.items, &out);
+    comptime var i = 0;
+    inline while (i<pastries.len) : (i += 1) {
+        expect(out[i].weight == pastries[i].weight);
+    }
 }
