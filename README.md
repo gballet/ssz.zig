@@ -12,6 +12,7 @@ Currently supported types:
  * `boolean`
  * structures
  * optionals
+ * `Vector[N]`
 
 ## Deserialization
 

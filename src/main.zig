@@ -22,6 +22,26 @@ fn serialized_size(comptime T: type, data: T) !usize {
     };
 }
 
+/// Returns true if an object is of fixed size
+fn is_fixed_size_object(comptime T : type) !bool {
+    const info = @typeInfo(T);
+    switch (info) {
+        .Bool, .Int, .Null => return true,
+        .Array => return false,
+        .Struct => inline for (info.Struct.fields) |field| {
+            if (! try is_fixed_size_object(field.field_type)) {
+                return false;
+            }
+        },
+        .Pointer => switch (info.Pointer.size) {
+            .Many, .Slice, .C => return false,
+            .One => return is_fixed_size_object(info.Pointer.child),
+        },
+        else => return error.UnknownType,
+    }
+    return true;
+}
+
 /// Provides the generic serialization of any `data` var to SSZ. The
 /// serialization is written to the `ArrayList` `l`.
 pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
@@ -68,10 +88,31 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                     }
                 },
                 else => {
-                    return error.UnknownType;
+                    // If the item type is fixed-size, serialize inline,
+                    // otherwise, create an array of offsets and then
+                    // serialize each object afterwards.
+                    if (try is_fixed_size_object(info.Array.child)) {
+                        for (data) |item| {
+                            try serialize(info.Array.child, item, l);
+                        }
+                    } else {
+                        // Size of the buffer before anything is
+                        // written to it.
+                        var start = l.items.len;
 
-                    for (data) |item| {
-                        try serialize(info.Array.child, item, l);
+                        // Reserve the space for the offset
+                        const offset = [_]u8{0, 0, 0, 0};
+                        for (data) |_| {
+                            _ = try l.writer().write(offset[0..4]);
+                        }
+
+                        // Now serialize one item after the other
+                        // and update the offset list with its location.
+                        for (data) |item,index| {
+                            std.mem.writeIntLittle(u32, l.items[start..start+4][0..4], @truncate(u32, l.items.len));
+                            _ = try serialize(info.Array.child, item, l);
+                            start += 4;
+                        }
                     }
                 },
             }
@@ -240,6 +281,15 @@ test "serializes an array of shorts" {
     defer list.deinit();
     try serialize([]const u16, data[0..data.len], &list);
     expect(std.mem.eql(u8, list.items, expected));
+}
+
+test "serializes an array of structures" { 
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    const exp = [_]u8{8,0,0,0,23,0,0,0,6,0,0,0,20,0,99,114,111,105,115,115,97,110,116,6,0,0,0,244,1,72,101,114,114,101,110,116,111,114,116,101};
+
+    try serialize(@TypeOf(pastries), pastries, &list);
+    expect(std.mem.eql(u8, list.items, exp[0..]));
 }
 
 test "serializes a structure without variable fields" {
