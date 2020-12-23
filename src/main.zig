@@ -387,6 +387,28 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                     }
                 },
                 else => {
+                    comptime const U = info.Array.child;
+                    if (try is_fixed_size_object(U)) {
+                        comptime var i = 0;
+                        comptime const pitch = @sizeOf(U);
+                        inline while (i < out.len) : (i += pitch) {
+                            try deserialize(U, serialized[i * pitch .. (i + 1) * pitch], &out[i]);
+                        }
+                    } else {
+                        // first variable index is also the size of the list
+                        // of indices. Recast that list as a []const u32.
+                        const size = std.mem.readIntLittle(u32, serialized[0..4]) / @sizeOf(u32);
+                        const indices = std.mem.bytesAsSlice(u32, serialized[0..size*4]);
+                        var i = @as(usize, 0);
+                        while (i < size) : (i += 1) {
+                            const end = if (i < size - 1) indices[i+1] else serialized.len;
+                            const start = indices[i];
+                            if (start >= serialized.len or end > serialized.len) {
+                                return error.IndexOutOfBounds;
+                            }
+                            try deserialize(U, serialized[start..end], &out[i]);
+                        }
+                    }
                 },
             }
         },
@@ -527,10 +549,14 @@ test "deserializes a Vector[N]" {
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
 
-    const serialized_data = try serialize([2]Pastry, pastries, &list);
+    try serialize([2]Pastry, pastries, &list);
     try deserialize(@TypeOf(pastries), list.items, &out);
     comptime var i = 0;
     inline while (i<pastries.len) : (i += 1) {
         expect(out[i].weight == pastries[i].weight);
+        expect(std.mem.eql(u8, pastries[i].name, out[i].name));
+    }
+}
+
     }
 }

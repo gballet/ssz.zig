@@ -23,6 +23,7 @@ Supported types:
  * structures
  * strings
  * `BitVector[N]`
+ * `Vector[N]`
 
 ## Merkelization
 
