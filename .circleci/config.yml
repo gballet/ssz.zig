@@ -1,0 +1,21 @@
+version: 2.1
+jobs:
+  test_latest:
+    docker:
+      - image: euantorano/zig:latest
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: print zig version
+          command: |
+            zig version
+      - run:
+          name: run tests
+          command: |
+            zig build test
+workflows:
+  version: 2
+  commit:
+    jobs:
+      - test_latest
