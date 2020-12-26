@@ -558,5 +558,18 @@ test "deserializes a Vector[N]" {
     }
 }
 
+test "deserializes an invalid Vector[N] payload" {
+    var out : [2]Pastry = undefined;
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+
+    try serialize([2]Pastry, pastries, &list);
+    if (deserialize(@TypeOf(pastries), list.items[0..list.items.len/2], &out)) {
+        @panic("missed error");
+    } else |err| switch (err) {
+        error.IndexOutOfBounds => {},
+        else => {
+            @panic("unexpected error");
+        },
     }
 }
