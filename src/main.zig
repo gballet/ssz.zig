@@ -23,13 +23,13 @@ fn serialized_size(comptime T: type, data: T) !usize {
 }
 
 /// Returns true if an object is of fixed size
-fn is_fixed_size_object(comptime T : type) !bool {
+fn is_fixed_size_object(comptime T: type) !bool {
     const info = @typeInfo(T);
     switch (info) {
         .Bool, .Int, .Null => return true,
         .Array => return false,
         .Struct => inline for (info.Struct.fields) |field| {
-            if (! try is_fixed_size_object(field.field_type)) {
+            if (!try is_fixed_size_object(field.field_type)) {
                 return false;
             }
         },
@@ -101,15 +101,15 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                         var start = l.items.len;
 
                         // Reserve the space for the offset
-                        const offset = [_]u8{0, 0, 0, 0};
+                        const offset = [_]u8{ 0, 0, 0, 0 };
                         for (data) |_| {
                             _ = try l.writer().write(offset[0..4]);
                         }
 
                         // Now serialize one item after the other
                         // and update the offset list with its location.
-                        for (data) |item,index| {
-                            std.mem.writeIntLittle(u32, l.items[start..start+4][0..4], @truncate(u32, l.items.len));
+                        for (data) |item, index| {
+                            std.mem.writeIntLittle(u32, l.items[start .. start + 4][0..4], @truncate(u32, l.items.len));
                             _ = try serialize(info.Array.child, item, l);
                             start += 4;
                         }
@@ -283,10 +283,10 @@ test "serializes an array of shorts" {
     expect(std.mem.eql(u8, list.items, expected));
 }
 
-test "serializes an array of structures" { 
+test "serializes an array of structures" {
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
-    const exp = [_]u8{8,0,0,0,23,0,0,0,6,0,0,0,20,0,99,114,111,105,115,115,97,110,116,6,0,0,0,244,1,72,101,114,114,101,110,116,111,114,116,101};
+    const exp = [_]u8{ 8, 0, 0, 0, 23, 0, 0, 0, 6, 0, 0, 0, 20, 0, 99, 114, 111, 105, 115, 115, 97, 110, 116, 6, 0, 0, 0, 244, 1, 72, 101, 114, 114, 101, 110, 116, 111, 114, 116, 101 };
 
     try serialize(@TypeOf(pastries), pastries, &list);
     expect(std.mem.eql(u8, list.items, exp[0..]));
@@ -398,10 +398,10 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                         // first variable index is also the size of the list
                         // of indices. Recast that list as a []const u32.
                         const size = std.mem.readIntLittle(u32, serialized[0..4]) / @sizeOf(u32);
-                        const indices = std.mem.bytesAsSlice(u32, serialized[0..size*4]);
+                        const indices = std.mem.bytesAsSlice(u32, serialized[0 .. size * 4]);
                         var i = @as(usize, 0);
                         while (i < size) : (i += 1) {
-                            const end = if (i < size - 1) indices[i+1] else serialized.len;
+                            const end = if (i < size - 1) indices[i + 1] else serialized.len;
                             const start = indices[i];
                             if (start >= serialized.len or end > serialized.len) {
                                 return error.IndexOutOfBounds;
@@ -420,30 +420,30 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
             // Calculate the number of variable fields in the
             // struct.
             comptime var n_var_fields = 0;
-             comptime {
+            comptime {
                 for (info.Struct.fields) |field| {
                     switch (@typeInfo(field.field_type)) {
                         .Int, .Bool => {},
-                        else =>n_var_fields += 1,
+                        else => n_var_fields += 1,
                     }
                 }
             }
 
-            var indices : [n_var_fields]u32 = undefined;
+            var indices: [n_var_fields]u32 = undefined;
 
             // First pass, read the value of each fixed-size field,
             // and write down the start offset of each variable-sized
             // field.
             comptime var i = 0;
-            inline for (info.Struct.fields) |field,field_index| {
+            inline for (info.Struct.fields) |field, field_index| {
                 switch (@typeInfo(field.field_type)) {
                     .Bool, .Int => {
                         // Direct deserialize
-                        try deserialize(field.field_type, serialized[i..i+@sizeOf(field.field_type)], &@field(out.*, field.name));
+                        try deserialize(field.field_type, serialized[i .. i + @sizeOf(field.field_type)], &@field(out.*, field.name));
                         i += @sizeOf(field.field_type);
                     },
-                    else => { 
-                        try deserialize(u32, serialized[i..i+4], &indices[field_index]);
+                    else => {
+                        try deserialize(u32, serialized[i .. i + 4], &indices[field_index]);
                         i += 4;
                     },
                 }
@@ -454,12 +454,12 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
             comptime var last_index = 0;
             inline for (info.Struct.fields) |field| {
                 switch (@typeInfo(field.field_type)) {
-                    .Bool, .Int => {},  // covered by the previous pass
+                    .Bool, .Int => {}, // covered by the previous pass
                     else => {
-                        const end = if (last_index == indices.len-1) serialized.len else indices[last_index+1];
+                        const end = if (last_index == indices.len - 1) serialized.len else indices[last_index + 1];
                         try deserialize(field.field_type, serialized[indices[last_index]..end], &@field(out.*, field.name));
                         last_index += 1;
-                    }
+                    },
                 }
             }
         },
@@ -494,37 +494,37 @@ test "deserializes a boolean" {
 
 test "deserializes a Bitvector[N]" {
     const exp = [_]bool{ true, false, true, true, false, false, false };
-    var out = [_]bool{false, false, false, false, false, false, false};
+    var out = [_]bool{ false, false, false, false, false, false, false };
     const serialized_data = [_]u8{0b00001101};
     try deserialize([7]bool, serialized_data[0..1], &out);
     comptime var i = 0;
-    inline while (i<7) : (i += 1) {
+    inline while (i < 7) : (i += 1) {
         expect(out[i] == exp[i]);
     }
 }
 
 test "deserializes a string" {
     const exp = "croissants";
-    
+
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
     const serialized = try serialize([]const u8, exp, &list);
 
-    var got : []const u8 = undefined;
+    var got: []const u8 = undefined;
 
     try deserialize([]const u8, list.items, &got);
     expect(std.mem.eql(u8, exp, got));
 }
 
 const Pastry = struct {
-    name : []const u8,
-    weight : u16,
+    name: []const u8,
+    weight: u16,
 };
 
 const pastries = [_]Pastry{
     Pastry{
         .name = "croissant",
-        .weight = 20
+        .weight = 20,
     },
     Pastry{
         .name = "Herrentorte",
@@ -533,7 +533,7 @@ const pastries = [_]Pastry{
 };
 
 test "deserializes a structure" {
-    var out = Pastry { .name = "", .weight = 0};
+    var out = Pastry{ .name = "", .weight = 0 };
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
 
@@ -545,26 +545,26 @@ test "deserializes a structure" {
 }
 
 test "deserializes a Vector[N]" {
-    var out : [2]Pastry = undefined;
+    var out: [2]Pastry = undefined;
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
 
     try serialize([2]Pastry, pastries, &list);
     try deserialize(@TypeOf(pastries), list.items, &out);
     comptime var i = 0;
-    inline while (i<pastries.len) : (i += 1) {
+    inline while (i < pastries.len) : (i += 1) {
         expect(out[i].weight == pastries[i].weight);
         expect(std.mem.eql(u8, pastries[i].name, out[i].name));
     }
 }
 
 test "deserializes an invalid Vector[N] payload" {
-    var out : [2]Pastry = undefined;
+    var out: [2]Pastry = undefined;
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
 
     try serialize([2]Pastry, pastries, &list);
-    if (deserialize(@TypeOf(pastries), list.items[0..list.items.len/2], &out)) {
+    if (deserialize(@TypeOf(pastries), list.items[0 .. list.items.len / 2], &out)) {
         @panic("missed error");
     } else |err| switch (err) {
         error.IndexOutOfBounds => {},
