@@ -1,5 +1,15 @@
 version: 2.1
 jobs:
+  lint:
+    docker:
+      - image: euantorano/zig:latest
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: run linter
+          command: |
+            zig fmt --check src/main.zig
   test_latest:
     docker:
       - image: euantorano/zig:latest
@@ -19,3 +29,4 @@ workflows:
   commit:
     jobs:
       - test_latest
+      - lint
