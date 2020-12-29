@@ -463,6 +463,21 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                 }
             }
         },
+        .Union => {
+            // Read the type index
+            var union_index: u32 = undefined;
+            try deserialize(u32, serialized, &union_index);
+
+            // Use the index to figure out which type must
+            // be deserialized.
+            inline for (info.Union.fields) |field, index| {
+                if (index == union_index) {
+                    var data: field.field_type = undefined;
+                    try deserialize(field.field_type, serialized[4..], &data);
+                    out.* = @unionInit(T, field.name, data);
+                }
+            }
+        },
         else => return error.NotImplemented,
     }
 }
@@ -572,4 +587,21 @@ test "deserializes an invalid Vector[N] payload" {
             @panic("unexpected error");
         },
     }
+}
+
+test "deserializes an union" {
+    const Payload = union {
+        int: u32,
+        boolean: bool,
+    };
+
+    var p: Payload = undefined;
+    try deserialize(Payload, ([_]u8{ 1, 0, 0, 0, 1 })[0..], &p);
+    expect(p.boolean == true);
+
+    try deserialize(Payload, ([_]u8{ 1, 0, 0, 0, 0 })[0..], &p);
+    expect(p.boolean == false);
+
+    try deserialize(Payload, ([_]u8{ 0, 0, 0, 0, 1, 2, 3, 4 })[0..], &p);
+    expect(p.int == 0x04030201);
 }
