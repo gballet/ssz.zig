@@ -645,7 +645,7 @@ test "chunk count of basic types" {
 test "chunk count of Bitvector[N]" {
     const data7 = [_]bool{ true, false, true, true, false, false, false };
     const data12 = [_]bool{ true, false, true, true, false, false, false, true, false, true, false, true };
-    var data384: [384]bool = undefined;
+    comptime var data384: [384]bool = undefined;
     comptime {
         var i = 0;
         while (i < data384.len) : (i += 1) {
@@ -659,7 +659,7 @@ test "chunk count of Bitvector[N]" {
 }
 
 test "chunk count of Vector[B, N]" {
-    var data: [17]u32 = undefined;
+    comptime var data: [17]u32 = undefined;
     comptime {
         var i = 0;
         while (i < data.len) : (i += 1) {
@@ -668,4 +668,12 @@ test "chunk count of Vector[B, N]" {
     }
 
     expect(chunk_count([17]u32, data) == 3);
+}
+
+test "chunk count of a struct" {
+    expect(chunk_count(Pastry, pastries[0]) == 2);
+}
+
+test "chunk count of a Vector[C, N]" {
+    expect(chunk_count([2]Pastry, pastries) == 2);
 }
