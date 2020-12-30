@@ -6,6 +6,12 @@ const ArrayList = std.ArrayList;
 const expect = std.testing.expect;
 const builtin = std.builtin;
 
+/// Number of bytes per chunk.
+const BYTES_PER_CHUNK = 32;
+
+/// Number of bytes per serialized length offset.
+const BYTES_PER_LENGTH_OFFSET = 4;
+
 fn serialized_size(comptime T: type, data: T) !usize {
     const info = @typeInfo(T);
     return switch (info) {
