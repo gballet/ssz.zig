@@ -605,3 +605,61 @@ test "deserializes an union" {
     try deserialize(Payload, ([_]u8{ 0, 0, 0, 0, 1, 2, 3, 4 })[0..], &p);
     expect(p.int == 0x04030201);
 }
+
+/// Calculates the number of leaves needed for the merkelization
+/// of this type.
+fn chunk_count(comptime T: type, data: T) usize {
+    const info = @typeInfo(T);
+    switch (info) {
+        .Int, .Bool => return 1,
+        .Pointer => return chunk_count(info.Pointer.child, data.*),
+        // the chunk size of an array depends on its type
+        .Array => switch (@typeInfo(info.Array.child)) {
+            // Bitvector[N]
+            .Bool => return (data.len + 255) / 256,
+            // Vector[B,N]
+            .Int => return (data.len * @sizeOf(info.Array.child) + 31) / 32,
+            // Vecotr[C,N]
+            else => return data.len,
+        },
+        .Struct => return info.Struct.fields.len,
+        else => return error.NotSupported,
+    }
+}
+
+test "chunk count of basic types" {
+    expect(chunk_count(bool, false) == 1);
+    expect(chunk_count(bool, true) == 1);
+    expect(chunk_count(u8, 1) == 1);
+    expect(chunk_count(u16, 1) == 1);
+    expect(chunk_count(u32, 1) == 1);
+    expect(chunk_count(u64, 1) == 1);
+}
+
+test "chunk count of Bitvector[N]" {
+    const data7 = [_]bool{ true, false, true, true, false, false, false };
+    const data12 = [_]bool{ true, false, true, true, false, false, false, true, false, true, false, true };
+    var data384: [384]bool = undefined;
+    comptime {
+        var i = 0;
+        while (i < data384.len) : (i += 1) {
+            data384[i] = i % 2 == 0;
+        }
+    }
+
+    expect(chunk_count([7]bool, data7) == 1);
+    expect(chunk_count([12]bool, data12) == 1);
+    expect(chunk_count([384]bool, data384) == 2);
+}
+
+test "chunk count of Vector[B, N]" {
+    var data: [17]u32 = undefined;
+    comptime {
+        var i = 0;
+        while (i < data.len) : (i += 1) {
+            data[i] = @as(u32, i);
+        }
+    }
+
+    expect(chunk_count([17]u32, data) == 3);
+}
