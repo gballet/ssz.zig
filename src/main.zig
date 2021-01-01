@@ -12,6 +12,10 @@ const BYTES_PER_CHUNK = 32;
 /// Number of bytes per serialized length offset.
 const BYTES_PER_LENGTH_OFFSET = 4;
 
+// Determine the serialized size of an object so that
+// the code for the serialization of variable-size
+// objects can determine which will be the offset to
+// the next variable-size object.
 fn serialized_size(comptime T: type, data: T) !usize {
     const info = @typeInfo(T);
     return switch (info) {
@@ -73,54 +77,51 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
         },
         .Array => {
             // Bitvector[N] or vector?
-            switch (@typeInfo(info.Array.child)) {
-                .Bool => {
-                    var byte: u8 = 0;
-                    for (data) |bit, index| {
-                        if (bit) {
-                            byte |= @as(u8, 1) << @truncate(u3, index);
-                        }
-
-                        if (index % 8 == 7) {
-                            try l.append(byte);
-                            byte = 0;
-                        }
+            if (info.Array.child == bool) {
+                var byte: u8 = 0;
+                for (data) |bit, index| {
+                    if (bit) {
+                        byte |= @as(u8, 1) << @truncate(u3, index);
                     }
 
-                    // Write the last byte if the length
-                    // is not byte-aligned
-                    if (data.len % 8 != 0) {
+                    if (index % 8 == 7) {
                         try l.append(byte);
+                        byte = 0;
                     }
-                },
-                else => {
-                    // If the item type is fixed-size, serialize inline,
-                    // otherwise, create an array of offsets and then
-                    // serialize each object afterwards.
-                    if (try is_fixed_size_object(info.Array.child)) {
-                        for (data) |item| {
-                            try serialize(info.Array.child, item, l);
-                        }
-                    } else {
-                        // Size of the buffer before anything is
-                        // written to it.
-                        var start = l.items.len;
+                }
 
-                        // Reserve the space for the offset
-                        const offset = [_]u8{ 0, 0, 0, 0 };
-                        for (data) |_| {
-                            _ = try l.writer().write(offset[0..4]);
-                        }
-
-                        // Now serialize one item after the other
-                        // and update the offset list with its location.
-                        for (data) |item, index| {
-                            std.mem.writeIntLittle(u32, l.items[start .. start + 4][0..4], @truncate(u32, l.items.len));
-                            _ = try serialize(info.Array.child, item, l);
-                            start += 4;
-                        }
+                // Write the last byte if the length
+                // is not byte-aligned
+                if (data.len % 8 != 0) {
+                    try l.append(byte);
+                }
+            } else {
+                // If the item type is fixed-size, serialize inline,
+                // otherwise, create an array of offsets and then
+                // serialize each object afterwards.
+                if (try is_fixed_size_object(info.Array.child)) {
+                    for (data) |item| {
+                        try serialize(info.Array.child, item, l);
                     }
-                },
+                } else {
+                    // Size of the buffer before anything is
+                    // written to it.
+                    var start = l.items.len;
+
+                    // Reserve the space for the offset
+                    const offset = [_]u8{ 0, 0, 0, 0 };
+                    for (data) |_| {
+                        _ = try l.writer().write(offset[0..4]);
+                    }
+
+                    // Now serialize one item after the other
+                    // and update the offset list with its location.
+                    for (data) |item, index| {
+                        std.mem.writeIntLittle(u32, l.items[start .. start + 4][0..4], @truncate(u32, l.items.len));
+                        _ = try serialize(info.Array.child, item, l);
+                        start += 4;
+                    }
+                }
             }
         },
         .Pointer => {
@@ -190,54 +191,49 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
 test "serializes uint8" {
     var data: u8 = 0x55;
     const serialized_data = [_]u8{0x55};
-    const exp = serialized_data[0..serialized_data.len];
 
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
     try serialize(u8, data, &list);
-    expect(std.mem.eql(u8, list.items, exp));
+    expect(std.mem.eql(u8, list.items, serialized_data[0..]));
 }
 
 test "serializes uint16" {
     var data: u16 = 0x5566;
     const serialized_data = [_]u8{ 0x66, 0x55 };
-    const exp = serialized_data[0..serialized_data.len];
 
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
     try serialize(u16, data, &list);
-    expect(std.mem.eql(u8, list.items, exp));
+    expect(std.mem.eql(u8, list.items, serialized_data[0..]));
 }
 
 test "serializes uint32" {
     var data: u32 = 0x55667788;
     const serialized_data = [_]u8{ 0x88, 0x77, 0x66, 0x55 };
-    const exp = serialized_data[0..serialized_data.len];
 
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
     try serialize(u32, data, &list);
-    expect(std.mem.eql(u8, list.items, exp));
+    expect(std.mem.eql(u8, list.items, serialized_data[0..]));
 }
 
 test "serializes bool" {
     var data = false;
     var serialized_data = [_]u8{0x00};
-    var exp = serialized_data[0..serialized_data.len];
 
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
     try serialize(bool, data, &list);
-    expect(std.mem.eql(u8, list.items, exp));
+    expect(std.mem.eql(u8, list.items, serialized_data[0..]));
 
     data = true;
     serialized_data = [_]u8{0x01};
-    exp = serialized_data[0..serialized_data.len];
 
     var list2 = ArrayList(u8).init(std.testing.allocator);
     defer list2.deinit();
     try serialize(bool, data, &list2);
-    expect(std.mem.eql(u8, list2.items, exp));
+    expect(std.mem.eql(u8, list2.items, serialized_data[0..]));
 }
 
 test "serializes Bitvector[N] == [N]bool" {
@@ -281,12 +277,11 @@ test "serializes string" {
 test "serializes an array of shorts" {
     const data = [_]u16{ 0xabcd, 0xef01 };
     const serialized = [_]u8{ 0xcd, 0xab, 0x01, 0xef };
-    const expected = serialized[0..serialized.len];
 
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
     try serialize([]const u16, data[0..data.len], &list);
-    expect(std.mem.eql(u8, list.items, expected));
+    expect(std.mem.eql(u8, list.items, serialized[0..]));
 }
 
 test "serializes an array of structures" {
@@ -305,12 +300,11 @@ test "serializes a structure without variable fields" {
         .boolean = true,
     };
     const serialized_data = [_]u8{ 1, 3, 0, 0, 0, 1 };
-    const exp = serialized_data[0..serialized_data.len];
 
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
     try serialize(@TypeOf(data), data, &list);
-    expect(std.mem.eql(u8, list.items, exp));
+    expect(std.mem.eql(u8, list.items, serialized_data[0..]));
 }
 
 test "serializes a structure with variable fields" {
@@ -321,12 +315,11 @@ test "serializes a structure with variable fields" {
         .company = "DEV Inc.",
     };
     const serialized_data = [_]u8{ 9, 0, 0, 0, 32, 14, 0, 0, 0, 74, 97, 109, 101, 115, 68, 69, 86, 32, 73, 110, 99, 46 };
-    const exp = serialized_data[0..serialized_data.len];
 
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
     try serialize(@TypeOf(data), data, &list);
-    expect(std.mem.eql(u8, list.items, exp));
+    expect(std.mem.eql(u8, list.items, serialized_data[0..]));
 }
 
 test "serializes a structure with optional fields" {
@@ -342,12 +335,11 @@ test "serializes a structure with optional fields" {
     };
 
     const serialized_data = [_]u8{ 9, 0, 0, 0, 32, 14, 0, 0, 0, 74, 97, 109, 101, 115 };
-    const exp = serialized_data[0..serialized_data.len];
 
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
     try serialize(@TypeOf(data), data, &list);
-    expect(std.mem.eql(u8, list.items, exp));
+    expect(std.mem.eql(u8, list.items, serialized_data[0..]));
 }
 
 test "serializes an optional object" {
@@ -381,45 +373,43 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
         .Bool => out.* = (serialized[0] == 1),
         .Array => {
             // Bitvector[N] or regular vector?
-            switch (@typeInfo(info.Array.child)) {
-                .Bool => {
-                    for (serialized) |byte, bindex| {
-                        var i = @as(u8, 0);
-                        var b = byte;
-                        while (bindex * 8 + i < out.len and i < 8) : (i += 1) {
-                            out[bindex * 8 + i] = b & 1 == 1;
-                            b >>= 1;
-                        }
+            if (info.Array.child == bool) {
+                for (serialized) |byte, bindex| {
+                    var i = @as(u8, 0);
+                    var b = byte;
+                    while (bindex * 8 + i < out.len and i < 8) : (i += 1) {
+                        out[bindex * 8 + i] = b & 1 == 1;
+                        b >>= 1;
                     }
-                },
-                else => {
-                    comptime const U = info.Array.child;
-                    if (try is_fixed_size_object(U)) {
-                        comptime var i = 0;
-                        comptime const pitch = @sizeOf(U);
-                        inline while (i < out.len) : (i += pitch) {
-                            try deserialize(U, serialized[i * pitch .. (i + 1) * pitch], &out[i]);
-                        }
-                    } else {
-                        // first variable index is also the size of the list
-                        // of indices. Recast that list as a []const u32.
-                        const size = std.mem.readIntLittle(u32, serialized[0..4]) / @sizeOf(u32);
-                        const indices = std.mem.bytesAsSlice(u32, serialized[0 .. size * 4]);
-                        var i = @as(usize, 0);
-                        while (i < size) : (i += 1) {
-                            const end = if (i < size - 1) indices[i + 1] else serialized.len;
-                            const start = indices[i];
-                            if (start >= serialized.len or end > serialized.len) {
-                                return error.IndexOutOfBounds;
-                            }
-                            try deserialize(U, serialized[start..end], &out[i]);
-                        }
+                }
+            } else {
+                comptime const U = info.Array.child;
+                if (try is_fixed_size_object(U)) {
+                    comptime var i = 0;
+                    comptime const pitch = @sizeOf(U);
+                    inline while (i < out.len) : (i += pitch) {
+                        try deserialize(U, serialized[i * pitch .. (i + 1) * pitch], &out[i]);
                     }
-                },
+                } else {
+                    // first variable index is also the size of the list
+                    // of indices. Recast that list as a []const u32.
+                    const size = std.mem.readIntLittle(u32, serialized[0..4]) / @sizeOf(u32);
+                    const indices = std.mem.bytesAsSlice(u32, serialized[0 .. size * 4]);
+                    var i = @as(usize, 0);
+                    while (i < size) : (i += 1) {
+                        const end = if (i < size - 1) indices[i + 1] else serialized.len;
+                        const start = indices[i];
+                        if (start >= serialized.len or end > serialized.len) {
+                            return error.IndexOutOfBounds;
+                        }
+                        try deserialize(U, serialized[start..end], &out[i]);
+                    }
+                }
             }
         },
         .Pointer => {
-            // TODO allocate and copy the data.
+            // Data is not copied in this function, copy
+            // is therefore the responsibility of the caller.
             out.* = serialized[0..serialized.len];
         },
         .Struct => {
@@ -478,6 +468,9 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
             // be deserialized.
             inline for (info.Union.fields) |field, index| {
                 if (index == union_index) {
+                    // &@field(out.*, field.name) can not be used directly,
+                    // because this field type hasn't been activated at this
+                    // stage.
                     var data: field.field_type = undefined;
                     try deserialize(field.field_type, serialized[4..], &data);
                     out.* = @unionInit(T, field.name, data);
