@@ -456,6 +456,13 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                 };
             }
         },
+        .Optional => if (serialized.len != 0) {
+            var x : info.Optional.child = undefined;
+            try deserialize(info.Optional.child, serialized, &x);
+            out.* = x;
+        } else {
+            out.* = null;
+        },
         // Data is not copied in this function, copy is therefore
         // the responsibility of the caller.
         .Pointer => out.* = serialized[0..],
@@ -562,6 +569,24 @@ test "deserializes a Bitvector[N]" {
     inline while (i < 7) : (i += 1) {
         expect(out[i] == exp[i]);
     }
+}
+
+test "deserializes an Optional" {
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+
+    var out : ?u32 = undefined;
+    const exp : ?u32 = 10;
+    try serialize(?u32, exp, &list);
+    try deserialize(?u32, list.items, &out);
+    expect(out.? == exp.?);
+
+    var list2 = ArrayList(u8).init(std.testing.allocator);
+    defer list2.deinit();
+
+    try serialize(?u32, null, &list2);
+    try deserialize(?u32, list2.items, &out);
+    expect(out == null);
 }
 
 test "deserializes a string" {

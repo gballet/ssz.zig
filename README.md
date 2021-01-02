@@ -37,6 +37,7 @@ Supported types:
  * `BitVector[N]`
  * `Vector[N]`
  * unions
+ * optionals
 
 ## Merkelization
 
