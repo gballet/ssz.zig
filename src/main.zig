@@ -57,24 +57,6 @@ fn is_fixed_size_object(comptime T: type) !bool {
 pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
     const info = @typeInfo(T);
     switch (info) {
-        .Int => {
-            const N = @sizeOf(T);
-            comptime var i: usize = 0;
-            inline while (i < N) : (i += 1) {
-                const byte: u8 = switch (builtin.endian) {
-                    .Big => @truncate(u8, data >> (8 * (N - i - 1))),
-                    .Little => @truncate(u8, data >> (8 * i)),
-                };
-                try l.append(byte);
-            }
-        },
-        .Bool => {
-            if (data) {
-                try l.append(1);
-            } else {
-                try l.append(0);
-            }
-        },
         .Array => {
             // Bitvector[N] or vector?
             if (info.Array.child == bool) {
@@ -122,6 +104,24 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                         start += 4;
                     }
                 }
+            }
+        },
+        .Bool => {
+            if (data) {
+                try l.append(1);
+            } else {
+                try l.append(0);
+            }
+        },
+        .Int => {
+            const N = @sizeOf(T);
+            comptime var i: usize = 0;
+            inline while (i < N) : (i += 1) {
+                const byte: u8 = switch (builtin.endian) {
+                    .Big => @truncate(u8, data >> (8 * (N - i - 1))),
+                    .Little => @truncate(u8, data >> (8 * i)),
+                };
+                try l.append(byte);
             }
         },
         .Pointer => {
@@ -402,24 +402,6 @@ test "serializes a union" {
 pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
     const info = @typeInfo(T);
     switch (info) {
-        .Int => {
-            const N = @sizeOf(T);
-            comptime var i: usize = 0;
-            out.* = @as(T, 0);
-            inline while (i < N) : (i += 1) {
-                // if the integer takes more than one byte, then
-                // shift the result by one byte and OR the next
-                // byte in the sequence.
-                if (@sizeOf(T) > 1) {
-                    out.* <<= 8;
-                }
-                out.* |= switch (builtin.endian) {
-                    .Big => @as(T, serialized[i]),
-                    .Little => @as(T, serialized[N - i - 1]),
-                };
-            }
-        },
-        .Bool => out.* = (serialized[0] == 1),
         .Array => {
             // Bitvector[N] or regular vector?
             if (info.Array.child == bool) {
@@ -456,11 +438,27 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                 }
             }
         },
-        .Pointer => {
-            // Data is not copied in this function, copy
-            // is therefore the responsibility of the caller.
-            out.* = serialized[0..serialized.len];
+        .Bool => out.* = (serialized[0] == 1),
+        .Int => {
+            const N = @sizeOf(T);
+            comptime var i: usize = 0;
+            out.* = @as(T, 0);
+            inline while (i < N) : (i += 1) {
+                // if the integer takes more than one byte, then
+                // shift the result by one byte and OR the next
+                // byte in the sequence.
+                if (@sizeOf(T) > 1) {
+                    out.* <<= 8;
+                }
+                out.* |= switch (builtin.endian) {
+                    .Big => @as(T, serialized[i]),
+                    .Little => @as(T, serialized[N - i - 1]),
+                };
+            }
         },
+        // Data is not copied in this function, copy is therefore
+        // the responsibility of the caller.
+        .Pointer => out.* = serialized[0..],
         .Struct => {
             // Calculate the number of variable fields in the
             // struct.
