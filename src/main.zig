@@ -178,20 +178,19 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                 }
             }
         },
-        .Null => {
-            // Nothing to be added
-        },
+        // Nothing to be added
+        .Null => {},
         .Optional => if (data != null) try serialize(info.Optional.child, data.?, l),
         .Union => {
             if (info.Union.tag_type == null) {
                 return error.UnionIsNotTagged;
             }
             inline for (info.Union.fields) |f, index| {
-            if (@enumToInt(data) == index) {
-                try serialize(u32, index, l);
-                try serialize(f.field_type, @field(data, f.name), l);
-                return;
-            }
+                if (@enumToInt(data) == index) {
+                    try serialize(u32, index, l);
+                    try serialize(f.field_type, @field(data, f.name), l);
+                    return;
+                }
             }
         },
         else => {
@@ -373,7 +372,7 @@ test "serializes a union" {
     const exp = [_]u8{ 0, 0, 0, 0, 210, 4, 0, 0, 0, 0, 0, 0 };
     try serialize(Payload, Payload{ .int = 1234 }, &list);
     expect(std.mem.eql(u8, list.items, exp[0..]));
-   
+
     var list2 = ArrayList(u8).init(std.testing.allocator);
     defer list2.deinit();
     const exp2 = [_]u8{ 1, 0, 0, 0, 1 };
@@ -389,14 +388,17 @@ test "serializes a union" {
 
     var list3 = ArrayList(u8).init(std.testing.allocator);
     defer list3.deinit();
-    if (serialize(UnTaggedPayload, UnTaggedPayload{ .boolean = false}, &list3)) {
+    if (serialize(UnTaggedPayload, UnTaggedPayload{ .boolean = false }, &list3)) {
         @panic("didn't catch error");
-    } else |err| switch(err) {
+    } else |err| switch (err) {
         error.UnionIsNotTagged => {},
         else => @panic("invalid error"),
     }
 }
 
+/// Takes a byte array containing the serialized payload of type `T` (with
+/// possible trailing data) and deserializes it into the `T` object pointed
+/// at by `out`.
 pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
     const info = @typeInfo(T);
     switch (info) {
