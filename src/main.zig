@@ -182,6 +182,18 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
             // Nothing to be added
         },
         .Optional => if (data != null) try serialize(info.Optional.child, data.?, l),
+        .Union => {
+            if (info.Union.tag_type == null) {
+                return error.UnionIsNotTagged;
+            }
+            inline for (info.Union.fields) |f, index| {
+            if (@enumToInt(data) == index) {
+                try serialize(u32, index, l);
+                try serialize(f.field_type, @field(data, f.name), l);
+                return;
+            }
+            }
+        },
         else => {
             return error.UnknownType;
         },
@@ -348,6 +360,41 @@ test "serializes an optional object" {
     defer list.deinit();
     try serialize(@TypeOf(null_or_string), null_or_string, &list);
     expect(list.items.len == 0);
+}
+
+test "serializes a union" {
+    const Payload = union(enum) {
+        int: u64,
+        boolean: bool,
+    };
+
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    const exp = [_]u8{ 0, 0, 0, 0, 210, 4, 0, 0, 0, 0, 0, 0 };
+    try serialize(Payload, Payload{ .int = 1234 }, &list);
+    expect(std.mem.eql(u8, list.items, exp[0..]));
+   
+    var list2 = ArrayList(u8).init(std.testing.allocator);
+    defer list2.deinit();
+    const exp2 = [_]u8{ 1, 0, 0, 0, 1 };
+    try serialize(Payload, Payload{ .boolean = true }, &list2);
+    expect(std.mem.eql(u8, list2.items, exp2[0..]));
+
+    // Make sure that the code won't try to serialize untagged
+    // payloads.
+    const UnTaggedPayload = union {
+        int: u64,
+        boolean: bool,
+    };
+
+    var list3 = ArrayList(u8).init(std.testing.allocator);
+    defer list3.deinit();
+    if (serialize(UnTaggedPayload, UnTaggedPayload{ .boolean = false}, &list3)) {
+        @panic("didn't catch error");
+    } else |err| switch(err) {
+        error.UnionIsNotTagged => {},
+        else => @panic("invalid error"),
+    }
 }
 
 pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
