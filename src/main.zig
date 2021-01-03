@@ -26,6 +26,7 @@ fn serialized_size(comptime T: type, data: T) !usize {
             @as(usize, 0)
         else
             serialized_size(info.Optional.child, data.?),
+        .Null => @as(usize, 0),
         else => error.NoSerializedSizeAvailable,
     };
 }
