@@ -359,7 +359,11 @@ pub fn chunk_count(comptime T: type, data: T) usize {
 }
 
 
+const zero_chunk: [BYTES_PER_CHUNK]u8;
 
+fn merkelize(chunks: [][BYTES_PER_CHUNK]u8, limit: ?usize) ![32]u8 {
 
+    switch (chunks.len) {
+        else => return error.NotSupported,
     }
 }
