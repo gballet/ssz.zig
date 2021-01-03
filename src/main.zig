@@ -350,7 +350,7 @@ pub fn chunk_count(comptime T: type, data: T) usize {
             .Bool => return (data.len + 255) / 256,
             // Vector[B,N]
             .Int => return (data.len * @sizeOf(info.Array.child) + 31) / 32,
-            // Vecotr[C,N]
+            // Vector[C,N]
             else => return data.len,
         },
         .Struct => return info.Struct.fields.len,
@@ -358,11 +358,9 @@ pub fn chunk_count(comptime T: type, data: T) usize {
     }
 }
 
-
 const zero_chunk: [BYTES_PER_CHUNK]u8;
 
 fn merkelize(chunks: [][BYTES_PER_CHUNK]u8, limit: ?usize) ![32]u8 {
-
     switch (chunks.len) {
         else => return error.NotSupported,
     }
