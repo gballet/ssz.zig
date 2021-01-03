@@ -12,9 +12,8 @@ const BYTES_PER_CHUNK = 32;
 const BYTES_PER_LENGTH_OFFSET = 4;
 
 // Determine the serialized size of an object so that
-// the code for the serialization of variable-size
-// objects can determine which will be the offset to
-// the next variable-size object.
+// the code serializing of variable-size objects can
+// determine the offset to the next object.
 fn serialized_size(comptime T: type, data: T) !usize {
     const info = @typeInfo(T);
     return switch (info) {
@@ -259,7 +258,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
             }
         },
         .Optional => if (serialized.len != 0) {
-            var x : info.Optional.child = undefined;
+            var x: info.Optional.child = undefined;
             try deserialize(info.Optional.child, serialized, &x);
             out.* = x;
         } else {
