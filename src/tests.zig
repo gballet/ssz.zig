@@ -36,6 +36,16 @@ test "serializes uint32" {
     expect(std.mem.eql(u8, list.items, serialized_data[0..]));
 }
 
+test "serializes a int32" {
+    var data : i32 = -(0x11223344);
+    const serialized_data = [_]u8{ 0xbc, 0xcc, 0xdd, 0xee };
+
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    try serialize(i32, data, &list);
+    expect(std.mem.eql(u8, list.items, serialized_data[0..]));
+}
+
 test "serializes bool" {
     var data = false;
     var serialized_data = [_]u8{0x00};

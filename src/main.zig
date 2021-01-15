@@ -113,15 +113,9 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
             }
         },
         .Int => {
-            const N = @sizeOf(T);
-            comptime var i: usize = 0;
-            inline while (i < N) : (i += 1) {
-                const byte: u8 = switch (builtin.endian) {
-                    .Big => @truncate(u8, data >> (8 * (N - i - 1))),
-                    .Little => @truncate(u8, data >> (8 * i)),
-                };
-                try l.append(byte);
-            }
+            var serialized: [@sizeOf(T)]u8 = undefined;
+            std.mem.writeIntLittle(T, serialized[0..], data);
+            _ = try l.writer().write(serialized[0..]);
         },
         .Pointer => {
             // Bitlist[N] or list?
