@@ -372,7 +372,37 @@ pub fn chunk_count(comptime T: type, data: T) usize {
     }
 }
 
-const zero_chunk: [BYTES_PER_CHUNK]u8;
+const chunk = [BYTES_PER_CHUNK]u8;
+
+fn pack(comptime T: type, values: T, l: *ArrayList(u8)) ![]chunk {
+    try serialize(T, values, l);
+    const padding_size = (BYTES_PER_CHUNK - l.items.len) % BYTES_PER_CHUNK;
+    _ = try l.writer().write(zero_chunk[0..padding_size]);
+    return std.mem.bytesAsSlice(chunk, l.items);
+}
+const zero_chunk: chunk = [_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+test "pack u32" {
+    var expected: [32]u8 = undefined;
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    const out = try pack(u32, 0xdeadbeef, &list);
+
+    try std.fmt.hexToBytes(expected[0..], "efbeadde00000000000000000000000000000000000000000000000000000000");
+
+    std.testing.expect(std.mem.eql(u8, out[0][0..], expected[0..]));
+}
+
+test "pack bool" {
+    var expected: [32]u8 = undefined;
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    const out = try pack(bool, true, &list);
+
+    try std.fmt.hexToBytes(expected[0..], "0100000000000000000000000000000000000000000000000000000000000000");
+
+    std.testing.expect(std.mem.eql(u8, out[0][0..], expected[0..]));
+}
 
 fn merkelize(chunks: [][BYTES_PER_CHUNK]u8, limit: ?usize) ![32]u8 {
     switch (chunks.len) {
