@@ -331,6 +331,26 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
     }
 }
 
+fn mix_in_length(root: [32]u8, length: [32]u8, out: *[32]u8) void {
+    var hasher = std.crypto.hash.sha3.Sha3_256.init(std.crypto.hash.sha3.Sha3_256.Options{});
+    hasher.update(root[0..]);
+    hasher.update(length[0..]);
+    hasher.final(out[0..]);
+}
+
+test "mix_in_length" {
+    var root: [32]u8 = undefined;
+    var length: [32]u8 = undefined;
+    var expected: [32]u8 = undefined;
+    var mixin: [32]u8 = undefined;
+    try std.fmt.hexToBytes(root[0..], "2279cf111c15f2d594e7a0055e8735e7409e56ed4250735d6d2f2b0d1bcf8297");
+    try std.fmt.hexToBytes(length[0..], "deadbeef00000000000000000000000000000000000000000000000000000000");
+    try std.fmt.hexToBytes(expected[0..], "91bac5750e259d1ea683ff193334cbd1afb584e420964f678f9839076bb5f1e6");
+    mix_in_length(root, length, &mixin);
+
+    std.testing.expect(std.mem.eql(u8, mixin[0..], expected[0..]));
+}
+
 /// Calculates the number of leaves needed for the merkelization
 /// of this type.
 pub fn chunk_count(comptime T: type, data: T) usize {
