@@ -404,7 +404,7 @@ test "pack bool" {
     std.testing.expect(std.mem.eql(u8, out[0][0..], expected[0..]));
 }
 
-fn merkelize(chunks: [][BYTES_PER_CHUNK]u8, limit: ?usize) ![32]u8 {
+fn merkleize(chunks: [][BYTES_PER_CHUNK]u8, limit: ?usize) ![32]u8 {
     switch (chunks.len) {
         else => return error.NotSupported,
     }
