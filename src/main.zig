@@ -419,6 +419,37 @@ test "pack string" {
     std.testing.expect(std.mem.eql(u8, out[3][0..], expected[96..]));
 }
 
+fn next_pow_of_two(len : usize) !usize {
+    if (len == 0) {
+        return @as(usize, 0);
+    }
+
+    // check that the msb isn't set and
+    // return an error if it is, as it
+    // would overflow.
+    if (@clz(usize, len) == 0) {
+        return error.OverflowsUSize;
+    }
+
+    const n = std.math.log2(std.math.shl(usize, len, 1) - 1);
+    return std.math.powi(usize, 2, n);
+}
+
+test "next power of 2" {
+    var out = try next_pow_of_two(0b1);
+    std.debug.print("{}\n", .{out});
+    std.testing.expect(out == 1);
+    out = try next_pow_of_two(0b10);
+    std.testing.expect(out == 2);
+    out = try next_pow_of_two(0b11);
+    std.testing.expect(out == 4);
+
+    // special cases
+    out = try next_pow_of_two(0);
+    std.testing.expect(out == 0);
+    std.testing.expectError(error.OverflowsUSize, next_pow_of_two(std.math.maxInt(usize)));
+}
+
 fn merkleize(chunks: [][BYTES_PER_CHUNK]u8, limit: ?usize) ![32]u8 {
     switch (chunks.len) {
         else => return error.NotSupported,
