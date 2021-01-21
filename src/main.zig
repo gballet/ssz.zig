@@ -374,7 +374,7 @@ pub fn chunk_count(comptime T: type, data: T) usize {
 }
 
 const chunk = [BYTES_PER_CHUNK]u8;
-const zero_chunk: chunk = [_]u8{ 0 } ** 32;
+const zero_chunk: chunk = [_]u8{0} ** 32;
 
 fn pack(comptime T: type, values: T, l: *ArrayList(u8)) ![]chunk {
     try serialize(T, values, l);
@@ -420,7 +420,7 @@ test "pack string" {
     std.testing.expect(std.mem.eql(u8, out[3][0..], expected[96..]));
 }
 
-fn next_pow_of_two(len : usize) !usize {
+fn next_pow_of_two(len: usize) !usize {
     if (len == 0) {
         return @as(usize, 0);
     }
@@ -452,7 +452,7 @@ test "next power of 2" {
 }
 
 // List of root hashes of zero-subtries, up to depth 255.
-var hash_of_zeros : [256][32]u8 = undefined;
+var hash_of_zeros: [256][32]u8 = undefined;
 
 // builds the list of root hashes of zero subtrees.
 pub fn build_zeroes() void {
@@ -460,8 +460,8 @@ pub fn build_zeroes() void {
     comptime var i = 1;
     inline while (i < 256) : (i += 1) {
         var digest = sha256.init(sha256.Options{});
-        digest.update(hash_of_zeros[i-1][0..]);
-        digest.update(hash_of_zeros[i-1][0..]);
+        digest.update(hash_of_zeros[i - 1][0..]);
+        digest.update(hash_of_zeros[i - 1][0..]);
         digest.final(&hash_of_zeros[i]);
     }
 }
@@ -484,16 +484,16 @@ pub fn merkleize(chunks: []chunk, limit: ?usize, out: *[32]u8) void {
         1 => std.mem.copy(u8, out.*[0..], chunks[0][0..]),
         else => {
             var digest = sha256.init(sha256.Options{});
-            var buf : [32]u8 = undefined;
-    merkleize(chunks[0..size/2], size/2, &buf);
+            var buf: [32]u8 = undefined;
+            merkleize(chunks[0 .. size / 2], size / 2, &buf);
             digest.update(buf[0..]);
             if (size / 2 < chunks.len) {
-                merkleize(chunks[size/2..], size/2, &buf);
+                merkleize(chunks[size / 2 ..], size / 2, &buf);
                 digest.update(buf[0..]);
-            } else 
+            } else
                 digest.update(hash_of_zeros[limit.?][0..]);
             digest.final(out);
-    },
+        },
     }
 }
 
@@ -503,6 +503,6 @@ test "merkleize a string" {
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
     var chunks = try pack([]const u8, "a" ** 100, &list);
-    var out : [32]u8 = undefined;
+    var out: [32]u8 = undefined;
     merkleize(chunks, null, &out);
 }
