@@ -4,6 +4,7 @@
 const std = @import("std");
 const ArrayList = std.ArrayList;
 const builtin = std.builtin;
+const sha256 = std.crypto.hash.sha3.Sha3_256;
 
 /// Number of bytes per chunk.
 const BYTES_PER_CHUNK = 32;
@@ -450,8 +451,58 @@ test "next power of 2" {
     std.testing.expectError(error.OverflowsUSize, next_pow_of_two(std.math.maxInt(usize)));
 }
 
-fn merkleize(chunks: [][BYTES_PER_CHUNK]u8, limit: ?usize) ![32]u8 {
-    switch (chunks.len) {
-        else => return error.NotSupported,
+// List of root hashes of zero-subtries, up to depth 255.
+var hash_of_zeros : [256][32]u8 = undefined;
+
+// builds the list of root hashes of zero subtrees.
+pub fn build_zeroes() void {
+    sha256.hash("", &hash_of_zeros[0], sha256.Options{});
+    comptime var i = 1;
+    inline while (i < 256) : (i += 1) {
+        var digest = sha256.init(sha256.Options{});
+        digest.update(hash_of_zeros[i-1][0..]);
+        digest.update(hash_of_zeros[i-1][0..]);
+        digest.final(&hash_of_zeros[i]);
     }
+}
+
+// merkleize recursively calculates the root hash of a Merkle tree.
+// As of 0.7.0, zig doesn't handle error unions in recursive funcs,
+// so the function will panic if it encounters an error.
+pub fn merkleize(chunks: []chunk, limit: ?usize, out: *[32]u8) void {
+    // Calculate the number of chunks to be padded, check the limit
+    // zig doesn't currently support error unions in recursive functions,
+    // so panic instead.
+    if (limit != null and chunks.len > limit.?) {
+        @panic("chunks size exceeds limit");
+    }
+    var size = next_pow_of_two(limit orelse chunks.len) catch @panic("error in calculating next power of two");
+
+    // Perform the merkelization
+    switch (chunks.len) {
+        0 => std.mem.copy(u8, out.*[0..], zero_chunk[0..]),
+        1 => std.mem.copy(u8, out.*[0..], chunks[0][0..]),
+        else => {
+            var digest = sha256.init(sha256.Options{});
+            var buf : [32]u8 = undefined;
+    merkleize(chunks[0..size/2], size/2, &buf);
+            digest.update(buf[0..]);
+            if (size / 2 < chunks.len) {
+                merkleize(chunks[size/2..], size/2, &buf);
+                digest.update(buf[0..]);
+            } else 
+                digest.update(hash_of_zeros[limit.?][0..]);
+            digest.final(out);
+    },
+    }
+}
+
+test "merkleize a string" {
+    build_zeroes();
+
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    var chunks = try pack([]const u8, "a" ** 100, &list);
+    var out : [32]u8 = undefined;
+    merkleize(chunks, null, &out);
 }
