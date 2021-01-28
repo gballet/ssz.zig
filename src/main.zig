@@ -505,4 +505,26 @@ test "merkleize a string" {
     var chunks = try pack([]const u8, "a" ** 100, &list);
     var out: [32]u8 = undefined;
     merkleize(chunks, null, &out);
+    // Build the expected tree
+    const leaf1 = [_]u8{0x61} ** 32; // "0xaaaaa....aa" 32 times
+    var leaf2 : [32]u8 = undefined;
+    try std.fmt.hexToBytes(leaf2[0..], "6161616100000000000000000000000000000000000000000000000000000000");
+    var root : [32]u8 = undefined;
+    var internal_left : [32]u8 = undefined;
+    var internal_right : [32]u8 = undefined;
+    var hasher = sha256.init(sha256.Options{});
+    hasher.update(leaf1[0..]);
+    hasher.update(leaf1[0..]);
+    hasher.final(&internal_left);
+    hasher = sha256.init(sha256.Options{});
+    hasher.update(leaf1[0..]);
+    hasher.update(leaf2[0..]);
+    hasher.final(&internal_right);
+    hasher = sha256.init(sha256.Options{});
+    hasher.update(internal_left[0..]);
+    hasher.update(internal_right[0..]);
+    hasher.final(&root);
+
+    std.testing.expect(std.mem.eql(u8, out[0..], root[0..]));
+}
 }

@@ -41,7 +41,7 @@ Supported types:
 
 ## Merkelization
 
-TODO
+Experimental
 
 ## Contributing
 
