@@ -507,11 +507,11 @@ test "merkleize a string" {
     merkleize(chunks, null, &out);
     // Build the expected tree
     const leaf1 = [_]u8{0x61} ** 32; // "0xaaaaa....aa" 32 times
-    var leaf2 : [32]u8 = undefined;
+    var leaf2: [32]u8 = undefined;
     try std.fmt.hexToBytes(leaf2[0..], "6161616100000000000000000000000000000000000000000000000000000000");
-    var root : [32]u8 = undefined;
-    var internal_left : [32]u8 = undefined;
-    var internal_right : [32]u8 = undefined;
+    var root: [32]u8 = undefined;
+    var internal_left: [32]u8 = undefined;
+    var internal_right: [32]u8 = undefined;
     var hasher = sha256.init(sha256.Options{});
     hasher.update(leaf1[0..]);
     hasher.update(leaf1[0..]);
