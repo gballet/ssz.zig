@@ -527,4 +527,3 @@ test "merkleize a string" {
 
     std.testing.expect(std.mem.eql(u8, out[0..], root[0..]));
 }
-}
