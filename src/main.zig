@@ -547,5 +547,13 @@ test "merkleize a boolean" {
     merkleize(chunks, null, &out);
     std.testing.expect(std.mem.eql(u8, out[0..], expected[0..]));
 }
+test "merkleize a bytes16 vector with one element" {
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    var chunks = try pack([16]u8, [_]u8{0xaa} ** 16, &list);
+    var expected: [32]u8 = undefined;
+    try std.fmt.hexToBytes(expected[0..], "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa00000000000000000000000000000000");
+    var out: [32]u8 = undefined;
+    merkleize(chunks, null, &out);
     std.testing.expect(std.mem.eql(u8, out[0..], expected[0..]));
 }
