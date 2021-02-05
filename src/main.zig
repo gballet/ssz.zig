@@ -527,3 +527,25 @@ test "merkleize a string" {
 
     std.testing.expect(std.mem.eql(u8, out[0..], root[0..]));
 }
+
+test "merkleize a boolean" {
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+
+    var chunks = try pack(bool, false, &list);
+    var expected = [_]u8{0} ** BYTES_PER_CHUNK;
+    var out: [BYTES_PER_CHUNK]u8 = undefined;
+    merkleize(chunks, null, &out);
+
+    std.testing.expect(std.mem.eql(u8, out[0..], expected[0..]));
+
+    var list2 = ArrayList(u8).init(std.testing.allocator);
+    defer list2.deinit();
+
+    chunks = try pack(bool, true, &list2);
+    expected[0] = 1;
+    merkleize(chunks, null, &out);
+    std.testing.expect(std.mem.eql(u8, out[0..], expected[0..]));
+}
+    std.testing.expect(std.mem.eql(u8, out[0..], expected[0..]));
+}
