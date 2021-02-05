@@ -4,7 +4,7 @@
 const std = @import("std");
 const ArrayList = std.ArrayList;
 const builtin = std.builtin;
-const sha256 = std.crypto.hash.sha3.Sha3_256;
+const sha256 = std.crypto.hash.sha2.Sha256;
 
 /// Number of bytes per chunk.
 const BYTES_PER_CHUNK = 32;
