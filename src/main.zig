@@ -608,13 +608,18 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8) !void {
     }
 }
 
+const a_bits = [_]bool{ true, false, true, false } ** 32;
+const b_bits = [_]bool{ true, false, true, true } ** 32;
+const a_bytes = [_]u8{0xaa} ** 16;
+const b_bytes = [_]u8{0xbb} ** 16;
+const empty_bytes = [_]u8{0} ** 16;
 test "calculate root hash of an array of two Bitvector[128]" {
-    var deserialized: [2][128]bool = [2][128]bool{ [_]bool{ true, false, true, false } ** 32, [_]bool{ true, false, true, true } ** 32 };
+    var deserialized: [2][128]bool = [2][128]bool{ a_bits, b_bits };
     var hashed: [32]u8 = undefined;
     try hash_tree_root(@TypeOf(deserialized), deserialized, &hashed);
 
     var expected: [32]u8 = undefined;
-    const expected_preimage = [_]u8{0xaa} ** 16 ++ [_]u8{0} ** 16 ++ [_]u8{0xbb} ** 16 ++ [_]u8{0} ** 16;
+    const expected_preimage = a_bytes ++ empty_bytes ++ b_bytes ++ empty_bytes;
     sha256.hash(expected_preimage[0..], &expected, sha256.Options{});
 
     std.testing.expect(std.mem.eql(u8, hashed[0..], expected[0..]));
