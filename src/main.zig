@@ -555,3 +555,10 @@ test "merkleize a bytes16 vector with one element" {
     merkleize(chunks, null, &out);
     std.testing.expect(std.mem.eql(u8, out[0..], expected[0..]));
 }
+
+pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8) !void {
+    const type_info = @typeInfo(T);
+    switch (type_info) {
+        else => return errors.NotSupported,
+    }
+}
