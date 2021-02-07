@@ -556,9 +556,56 @@ test "merkleize a bytes16 vector with one element" {
     std.testing.expect(std.mem.eql(u8, out[0..], expected[0..]));
 }
 
+
+fn pack_bits(bits: []const bool, l: *ArrayList(u8)) ![]chunk {
+    var byte: u8 = 0;
+    for (bits) |bit, bitidx| {
+        if (bit) {
+            byte |= @as(u8, 1) << @truncate(u3, 7 - bitidx % 8);
+        }
+        if (bitidx % 8 == 7 or bitidx == bits.len - 1) {
+            try l.append(byte);
+            byte = 0;
+        }
+    }
+
+    // pad the last chunk with 0s
+    const padding_size = (BYTES_PER_CHUNK - l.items.len % BYTES_PER_CHUNK) % BYTES_PER_CHUNK;
+    _ = try l.writer().write(zero_chunk[0..padding_size]);
+
+    return std.mem.bytesAsSlice(chunk, l.items);
+}
+
 pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8) !void {
     const type_info = @typeInfo(T);
     switch (type_info) {
+        .Array => {
+            // Check if the child is a basic type. If so, return
+            // the merkle root of its chunked serialization.
+            // Otherwise, it is a composite object and the chunks
+            // are the merkle roots of its elements.
+            switch (@typeInfo(type_info.Array.child)) {
+                .Bool => {
+                    var list = ArrayList(u8).init(std.testing.allocator);
+                    defer list.deinit();
+                    var chunks = try pack_bits(value[0..], &list);
+                    merkleize(chunks, chunk_count(T, value), out);
+                },
+                else => return errors.NotSupported,
+            }
+        },
         else => return errors.NotSupported,
     }
+}
+
+test "calculate root hash of an array of two Bitvector[128]" {
+    var deserialized: [2][128]bool = [2][128]bool{ [_]bool{ true, false, true, false } ** 32, [_]bool{ true, false, true, true } ** 32 };
+    var hashed: [32]u8 = undefined;
+    try hash_tree_root(@TypeOf(deserialized), deserialized, &hashed);
+
+    var expected: [32]u8 = undefined;
+    const expected_preimage = [_]u8{0xaa} ** 16 ++ [_]u8{0} ** 16 ++ [_]u8{0xbb} ** 16 ++ [_]u8{0} ** 16;
+    sha256.hash(expected_preimage[0..], &expected, sha256.Options{});
+
+    std.testing.expect(std.mem.eql(u8, hashed[0..], expected[0..]));
 }
