@@ -591,10 +591,10 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8) !void {
                     var chunks = try pack_bits(value[0..], &list);
                     merkleize(chunks, chunk_count(T, value), out);
                 },
-                else => return errors.NotSupported,
+                else => return error.NotSupported,
             }
         },
-        else => return errors.NotSupported,
+        else => return error.NotSupported,
     }
 }
 
