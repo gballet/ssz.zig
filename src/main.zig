@@ -591,6 +591,16 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8) !void {
                     var chunks = try pack_bits(value[0..], &list);
                     merkleize(chunks, chunk_count(T, value), out);
                 },
+                .Array => {
+                    var chunks = ArrayList(chunk).init(std.testing.allocator);
+                    defer chunks.deinit();
+                    var tmp: chunk = undefined;
+                    for (value) |item| {
+                        try hash_tree_root(@TypeOf(item), item, &tmp);
+                        try chunks.append(tmp);
+                    }
+                    merkleize(chunks.items, null, out);
+                },
                 else => return error.NotSupported,
             }
         },
