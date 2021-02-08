@@ -37,7 +37,7 @@ test "serializes uint32" {
 }
 
 test "serializes a int32" {
-    var data : i32 = -(0x11223344);
+    var data: i32 = -(0x11223344);
     const serialized_data = [_]u8{ 0xbc, 0xcc, 0xdd, 0xee };
 
     var list = ArrayList(u8).init(std.testing.allocator);
