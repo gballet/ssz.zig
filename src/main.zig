@@ -456,7 +456,7 @@ var hash_of_zeros: [256][32]u8 = undefined;
 
 // builds the list of root hashes of zero subtrees.
 pub fn build_zeroes() void {
-    sha256.hash("", &hash_of_zeros[0], sha256.Options{});
+    std.mem.copy(u8, &hash_of_zeros[0], zero_chunk[0..]);
     comptime var i = 1;
     inline while (i < 256) : (i += 1) {
         var digest = sha256.init(sha256.Options{});
@@ -491,10 +491,7 @@ pub fn merkleize(chunks: []chunk, limit: ?usize, out: *[32]u8) void {
                 merkleize(chunks[size / 2 ..], size / 2, &buf);
                 digest.update(buf[0..]);
             } else {
-                var padidx: usize = 0;
-                while (padidx < size / 2) : (padidx += 1) {
-                    digest.update(zero_chunk[0..]);
-                }
+                digest.update(hash_of_zeros[size / 2 - 1][0..]);
             }
             digest.final(out);
         },
