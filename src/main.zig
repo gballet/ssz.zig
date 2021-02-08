@@ -479,7 +479,7 @@ pub fn merkleize(chunks: []chunk, limit: ?usize, out: *[32]u8) void {
     var size = next_pow_of_two(limit orelse chunks.len) catch @panic("error in calculating next power of two");
 
     // Perform the merkelization
-    switch (chunks.len) {
+    switch (size) {
         0 => std.mem.copy(u8, out.*[0..], zero_chunk[0..]),
         1 => std.mem.copy(u8, out.*[0..], chunks[0][0..]),
         else => {
@@ -490,8 +490,12 @@ pub fn merkleize(chunks: []chunk, limit: ?usize, out: *[32]u8) void {
             if (size / 2 < chunks.len) {
                 merkleize(chunks[size / 2 ..], size / 2, &buf);
                 digest.update(buf[0..]);
-            } else
-                digest.update(hash_of_zeros[limit.?][0..]);
+            } else {
+                var padidx: usize = 0;
+                while (padidx < size / 2) : (padidx += 1) {
+                    digest.update(zero_chunk[0..]);
+                }
+            }
             digest.final(out);
         },
     }
@@ -610,9 +614,13 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8) !void {
 
 const a_bits = [_]bool{ true, false, true, false } ** 32;
 const b_bits = [_]bool{ true, false, true, true } ** 32;
+const c_bits = [_]bool{ true, true, false, false } ** 32;
+
 const a_bytes = [_]u8{0xaa} ** 16;
 const b_bytes = [_]u8{0xbb} ** 16;
+const c_bytes = [_]u8{0xcc} ** 16;
 const empty_bytes = [_]u8{0} ** 16;
+
 test "calculate root hash of an array of two Bitvector[128]" {
     var deserialized: [2][128]bool = [2][128]bool{ a_bits, b_bits };
     var hashed: [32]u8 = undefined;
@@ -622,5 +630,23 @@ test "calculate root hash of an array of two Bitvector[128]" {
     const expected_preimage = a_bytes ++ empty_bytes ++ b_bytes ++ empty_bytes;
     sha256.hash(expected_preimage[0..], &expected, sha256.Options{});
 
+    std.testing.expect(std.mem.eql(u8, hashed[0..], expected[0..]));
+}
+
+test "calculate root hash of an array of three Bitvector[128]" {
+    var deserialized: [3][128]bool = [3][128]bool{ a_bits, b_bits, c_bits };
+    var hashed: [32]u8 = undefined;
+    try hash_tree_root(@TypeOf(deserialized), deserialized, &hashed);
+
+    var left: [32]u8 = undefined;
+    var expected: [32]u8 = undefined;
+    const preimg1 = a_bytes ++ empty_bytes ++ b_bytes ++ empty_bytes;
+    const preimg2 = c_bytes ++ empty_bytes ** 3;
+    sha256.hash(preimg1[0..], &left, sha256.Options{});
+    sha256.hash(preimg2[0..], &expected, sha256.Options{});
+    var digest = sha256.init(sha256.Options{});
+    digest.update(left[0..]);
+    digest.update(expected[0..]);
+    digest.final(&expected);
     std.testing.expect(std.mem.eql(u8, hashed[0..], expected[0..]));
 }
