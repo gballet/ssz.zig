@@ -557,7 +557,6 @@ test "merkleize a bytes16 vector with one element" {
     std.testing.expect(std.mem.eql(u8, out[0..], expected[0..]));
 }
 
-
 fn pack_bits(bits: []const bool, l: *ArrayList(u8)) ![]chunk {
     var byte: u8 = 0;
     for (bits) |bit, bitidx| {
