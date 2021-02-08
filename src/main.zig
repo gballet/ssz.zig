@@ -354,19 +354,19 @@ test "mix_in_length" {
 
 /// Calculates the number of leaves needed for the merkelization
 /// of this type.
-pub fn chunk_count(comptime T: type, data: T) usize {
+pub fn chunk_count(comptime T: type) usize {
     const info = @typeInfo(T);
     switch (info) {
         .Int, .Bool => return 1,
-        .Pointer => return chunk_count(info.Pointer.child, data.*),
+        .Pointer => return chunk_count(info.Pointer.child),
         // the chunk size of an array depends on its type
         .Array => switch (@typeInfo(info.Array.child)) {
             // Bitvector[N]
-            .Bool => return (data.len + 255) / 256,
+            .Bool => return (info.Array.len + 255) / 256,
             // Vector[B,N]
-            .Int => return (data.len * @sizeOf(info.Array.child) + 31) / 32,
+            .Int => return (info.Array.len * @sizeOf(info.Array.child) + 31) / 32,
             // Vector[C,N]
-            else => return data.len,
+            else => return info.Array.len,
         },
         .Struct => return info.Struct.fields.len,
         else => return error.NotSupported,
@@ -589,7 +589,7 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8) !void {
                     var list = ArrayList(u8).init(std.testing.allocator);
                     defer list.deinit();
                     var chunks = try pack_bits(value[0..], &list);
-                    merkleize(chunks, chunk_count(T, value), out);
+                    merkleize(chunks, chunk_count(T), out);
                 },
                 .Array => {
                     var chunks = ArrayList(chunk).init(std.testing.allocator);

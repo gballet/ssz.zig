@@ -356,46 +356,27 @@ test "deserializes an union" {
 }
 
 test "chunk count of basic types" {
-    expect(chunk_count(bool, false) == 1);
-    expect(chunk_count(bool, true) == 1);
-    expect(chunk_count(u8, 1) == 1);
-    expect(chunk_count(u16, 1) == 1);
-    expect(chunk_count(u32, 1) == 1);
-    expect(chunk_count(u64, 1) == 1);
+    expect(chunk_count(bool) == 1);
+    expect(chunk_count(u8) == 1);
+    expect(chunk_count(u16) == 1);
+    expect(chunk_count(u32) == 1);
+    expect(chunk_count(u64) == 1);
 }
 
 test "chunk count of Bitvector[N]" {
-    const data7 = [_]bool{ true, false, true, true, false, false, false };
-    const data12 = [_]bool{ true, false, true, true, false, false, false, true, false, true, false, true };
-    comptime var data384: [384]bool = undefined;
-    comptime {
-        var i = 0;
-        while (i < data384.len) : (i += 1) {
-            data384[i] = i % 2 == 0;
-        }
-    }
-
-    expect(chunk_count([7]bool, data7) == 1);
-    expect(chunk_count([12]bool, data12) == 1);
-    expect(chunk_count([384]bool, data384) == 2);
+    expect(chunk_count([7]bool) == 1);
+    expect(chunk_count([12]bool) == 1);
+    expect(chunk_count([384]bool) == 2);
 }
 
 test "chunk count of Vector[B, N]" {
-    comptime var data: [17]u32 = undefined;
-    comptime {
-        var i = 0;
-        while (i < data.len) : (i += 1) {
-            data[i] = @as(u32, i);
-        }
-    }
-
-    expect(chunk_count([17]u32, data) == 3);
+    expect(chunk_count([17]u32) == 3);
 }
 
 test "chunk count of a struct" {
-    expect(chunk_count(Pastry, pastries[0]) == 2);
+    expect(chunk_count(Pastry) == 2);
 }
 
 test "chunk count of a Vector[C, N]" {
-    expect(chunk_count([2]Pastry, pastries) == 2);
+    expect(chunk_count([2]Pastry) == 2);
 }
