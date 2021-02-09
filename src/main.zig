@@ -608,15 +608,26 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8) !void {
     }
 }
 
-const a_bits = [_]bool{ true, false, true, false } ** 32;
-const b_bits = [_]bool{ true, false, true, true } ** 32;
-const c_bits = [_]bool{ true, true, false, false } ** 32;
+// used at comptime to generate a bitvector from a byte vector
+fn bytes_to_bits(comptime N: usize, src: [N]u8) [N * 8]bool {
+    var bitvector: [N * 8]bool = undefined;
+    for (src) |byte, idx| {
+        var i = 0;
+        while (i < 8) : (i += 1) {
+            bitvector[i + idx * 8] = ((byte >> (7 - i)) & 1) == 1;
+        }
+    }
+    return bitvector;
+}
 
 const a_bytes = [_]u8{0xaa} ** 16;
 const b_bytes = [_]u8{0xbb} ** 16;
 const c_bytes = [_]u8{0xcc} ** 16;
 const empty_bytes = [_]u8{0} ** 16;
 
+const a_bits = bytes_to_bits(16, a_bytes);
+const b_bits = bytes_to_bits(16, b_bytes);
+const c_bits = bytes_to_bits(16, c_bytes);
 test "calculate root hash of an array of two Bitvector[128]" {
     var deserialized: [2][128]bool = [2][128]bool{ a_bits, b_bits };
     var hashed: [32]u8 = undefined;
