@@ -355,6 +355,18 @@ test "deserializes an union" {
     expect(p.int == 0x04030201);
 }
 
+test "serialize/deserialize a u256" {
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    const data = [_]u8{0xAA} ** 32;
+    var output: [32]u8 = undefined;
+
+    try serialize([32]u8, data, &list);
+    try deserialize([32]u8, list.items, &output);
+
+    expect(std.mem.eql(u8, data[0..], output[0..]));
+}
+
 test "chunk count of basic types" {
     expect(chunk_count(bool) == 1);
     expect(chunk_count(u8) == 1);
