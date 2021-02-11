@@ -438,7 +438,6 @@ fn next_pow_of_two(len: usize) !usize {
 
 test "next power of 2" {
     var out = try next_pow_of_two(0b1);
-    std.debug.print("{}\n", .{out});
     std.testing.expect(out == 1);
     out = try next_pow_of_two(0b10);
     std.testing.expect(out == 2);
@@ -483,17 +482,23 @@ pub fn merkleize(chunks: []chunk, limit: ?usize, out: *[32]u8) void {
         0 => std.mem.copy(u8, out.*[0..], zero_chunk[0..]),
         1 => std.mem.copy(u8, out.*[0..], chunks[0][0..]),
         else => {
+            // Merkleize the left side. If the number of chunks
+            // isn't enough to fill the entire width, complete
+            // with zeroes.
             var digest = sha256.init(sha256.Options{});
             var buf: [32]u8 = undefined;
             const split = if (size / 2 < chunks.len) size / 2 else chunks.len;
             merkleize(chunks[0..split], size / 2, &buf);
             digest.update(buf[0..]);
+
+            // Merkleize the right side. If the number of chunks only
+            // covers the first half, directly input the hashed zero-
+            // filled subtrie.
             if (size / 2 < chunks.len) {
                 merkleize(chunks[size / 2 ..], size / 2, &buf);
                 digest.update(buf[0..]);
-            } else {
+            } else
                 digest.update(hash_of_zeros[size / 2 - 1][0..]);
-            }
             digest.final(out);
         },
     }
