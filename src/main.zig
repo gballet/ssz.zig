@@ -597,6 +597,12 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8) !void {
             // Otherwise, it is a composite object and the chunks
             // are the merkle roots of its elements.
             switch (@typeInfo(type_info.Array.child)) {
+                .Int => {
+                    var list = ArrayList(u8).init(std.testing.allocator);
+                    defer list.deinit();
+                    var chunks = try pack(T, value, &list);
+                    merkleize(chunks, null, out);
+                },
                 .Bool => {
                     var list = ArrayList(u8).init(std.testing.allocator);
                     defer list.deinit();
@@ -672,6 +678,13 @@ test "calculate root hash of an array of two Bitvector[128]" {
     const expected_preimage = a_bytes ++ empty_bytes ++ b_bytes ++ empty_bytes;
     sha256.hash(expected_preimage[0..], &expected, sha256.Options{});
 
+    std.testing.expect(std.mem.eql(u8, hashed[0..], expected[0..]));
+}
+
+test "calculate the root hash of an array of integers" {
+    var expected = [_]u8{ 0xef, 0xbe, 0xad, 0xde, 0xfe, 0xca, 0xfe, 0xca } ++ [_]u8{0} ** 24;
+    var hashed: [32]u8 = undefined;
+    try hash_tree_root([2]u32, [_]u32{ 0xdeadbeef, 0xcafecafe }, &hashed);
     std.testing.expect(std.mem.eql(u8, hashed[0..], expected[0..]));
 }
 

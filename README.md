@@ -48,6 +48,7 @@ Supported types:
  * `Bitvector[N]`
  * `boolean`
  * `uintN`
+ * `Vector[N]`
 
 ## Contributing
 
