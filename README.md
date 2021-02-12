@@ -46,6 +46,8 @@ Use `tree_root_hash` to calculate the root hash of an object.
 Supported types:
 
  * `Bitvector[N]`
+ * `boolean`
+ * `uintN`
 
 ## Contributing
 

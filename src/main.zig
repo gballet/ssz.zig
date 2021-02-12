@@ -585,6 +585,12 @@ fn pack_bits(bits: []const bool, l: *ArrayList(u8)) ![]chunk {
 pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8) !void {
     const type_info = @typeInfo(T);
     switch (type_info) {
+        .Int, .Bool => {
+            var list = ArrayList(u8).init(std.testing.allocator);
+            defer list.deinit();
+            var chunks = try pack(T, value, &list);
+            merkleize(chunks, null, out);
+        },
         .Array => {
             // Check if the child is a basic type. If so, return
             // the merkle root of its chunked serialization.
@@ -638,6 +644,24 @@ const b_bits = bytes_to_bits(16, b_bytes);
 const c_bits = bytes_to_bits(16, c_bytes);
 const d_bits = bytes_to_bits(16, d_bytes);
 const e_bits = bytes_to_bits(16, e_bytes);
+
+test "calculate the root hash of a boolean" {
+    var expected = [_]u8{1} ++ [_]u8{0} ** 31;
+    var hashed: [32]u8 = undefined;
+    try hash_tree_root(bool, true, &hashed);
+    std.testing.expect(std.mem.eql(u8, hashed[0..], expected[0..]));
+
+    expected = [_]u8{0} ** 32;
+    try hash_tree_root(bool, false, &hashed);
+    std.testing.expect(std.mem.eql(u8, hashed[0..], expected[0..]));
+}
+
+test "calculate the root hash of an integer" {
+    var expected = [_]u8{ 0xef, 0xbe, 0xad, 0xde } ++ [_]u8{0} ** 28;
+    var hashed: [32]u8 = undefined;
+    try hash_tree_root(u32, 0xdeadbeef, &hashed);
+    std.testing.expect(std.mem.eql(u8, hashed[0..], expected[0..]));
+}
 
 test "calculate root hash of an array of two Bitvector[128]" {
     var deserialized: [2][128]bool = [2][128]bool{ a_bits, b_bits };
