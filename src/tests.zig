@@ -2,9 +2,11 @@ const libssz = @import("./main.zig");
 const serialize = libssz.serialize;
 const deserialize = libssz.deserialize;
 const chunk_count = libssz.chunk_count;
+const hash_tree_root = libssz.hash_tree_root;
 const std = @import("std");
 const ArrayList = std.ArrayList;
 const expect = std.testing.expect;
+const sha256 = std.crypto.hash.sha2.Sha256;
 
 test "serializes uint8" {
     var data: u8 = 0x55;
@@ -391,4 +393,110 @@ test "chunk count of a struct" {
 
 test "chunk count of a Vector[C, N]" {
     expect(chunk_count([2]Pastry) == 2);
+}
+
+// used at comptime to generate a bitvector from a byte vector
+fn bytes_to_bits(comptime N: usize, src: [N]u8) [N * 8]bool {
+    var bitvector: [N * 8]bool = undefined;
+    for (src) |byte, idx| {
+        var i = 0;
+        while (i < 8) : (i += 1) {
+            bitvector[i + idx * 8] = ((byte >> (7 - i)) & 1) == 1;
+        }
+    }
+    return bitvector;
+}
+
+const a_bytes = [_]u8{0xaa} ** 16;
+const b_bytes = [_]u8{0xbb} ** 16;
+const c_bytes = [_]u8{0xcc} ** 16;
+const d_bytes = [_]u8{0xdd} ** 16;
+const e_bytes = [_]u8{0xee} ** 16;
+const empty_bytes = [_]u8{0} ** 16;
+
+const a_bits = bytes_to_bits(16, a_bytes);
+const b_bits = bytes_to_bits(16, b_bytes);
+const c_bits = bytes_to_bits(16, c_bytes);
+const d_bits = bytes_to_bits(16, d_bytes);
+const e_bits = bytes_to_bits(16, e_bytes);
+
+test "calculate the root hash of a boolean" {
+    var expected = [_]u8{1} ++ [_]u8{0} ** 31;
+    var hashed: [32]u8 = undefined;
+    try hash_tree_root(bool, true, &hashed);
+    std.testing.expect(std.mem.eql(u8, hashed[0..], expected[0..]));
+
+    expected = [_]u8{0} ** 32;
+    try hash_tree_root(bool, false, &hashed);
+    std.testing.expect(std.mem.eql(u8, hashed[0..], expected[0..]));
+}
+
+test "calculate root hash of an array of two Bitvector[128]" {
+    var deserialized: [2][128]bool = [2][128]bool{ a_bits, b_bits };
+    var hashed: [32]u8 = undefined;
+    try hash_tree_root(@TypeOf(deserialized), deserialized, &hashed);
+
+    var expected: [32]u8 = undefined;
+    const expected_preimage = a_bytes ++ empty_bytes ++ b_bytes ++ empty_bytes;
+    sha256.hash(expected_preimage[0..], &expected, sha256.Options{});
+
+    std.testing.expect(std.mem.eql(u8, hashed[0..], expected[0..]));
+}
+
+test "calculate the root hash of an array of integers" {
+    var expected = [_]u8{ 0xef, 0xbe, 0xad, 0xde, 0xfe, 0xca, 0xfe, 0xca } ++ [_]u8{0} ** 24;
+    var hashed: [32]u8 = undefined;
+    try hash_tree_root([2]u32, [_]u32{ 0xdeadbeef, 0xcafecafe }, &hashed);
+    std.testing.expect(std.mem.eql(u8, hashed[0..], expected[0..]));
+}
+
+test "calculate root hash of an array of three Bitvector[128]" {
+    var deserialized: [3][128]bool = [3][128]bool{ a_bits, b_bits, c_bits };
+    var hashed: [32]u8 = undefined;
+    try hash_tree_root(@TypeOf(deserialized), deserialized, &hashed);
+
+    var left: [32]u8 = undefined;
+    var expected: [32]u8 = undefined;
+    const preimg1 = a_bytes ++ empty_bytes ++ b_bytes ++ empty_bytes;
+    const preimg2 = c_bytes ++ empty_bytes ** 3;
+    sha256.hash(preimg1[0..], &left, sha256.Options{});
+    sha256.hash(preimg2[0..], &expected, sha256.Options{});
+    var digest = sha256.init(sha256.Options{});
+    digest.update(left[0..]);
+    digest.update(expected[0..]);
+    digest.final(&expected);
+
+    std.testing.expect(std.mem.eql(u8, hashed[0..], expected[0..]));
+}
+
+test "calculate the root hash of an array of five Bitvector[128]" {
+    var deserialized = [5][128]bool{ a_bits, b_bits, c_bits, d_bits, e_bits };
+    var hashed: [32]u8 = undefined;
+    try hash_tree_root(@TypeOf(deserialized), deserialized, &hashed);
+
+    var internal_nodes: [64]u8 = undefined;
+    var left: [32]u8 = undefined;
+    var expected: [32]u8 = undefined;
+    const preimg1 = a_bytes ++ empty_bytes ++ b_bytes ++ empty_bytes;
+    const preimg2 = c_bytes ++ empty_bytes ++ d_bytes ++ empty_bytes;
+    const preimg3 = e_bytes ++ empty_bytes ** 3;
+    const preimg4 = empty_bytes ** 4;
+
+    sha256.hash(preimg1[0..], &left, sha256.Options{});
+    sha256.hash(preimg2[0..], internal_nodes[0..32], sha256.Options{});
+    var digest = sha256.init(sha256.Options{});
+    digest.update(left[0..]);
+    digest.update(internal_nodes[0..32]);
+    digest.final(internal_nodes[0..32]);
+
+    sha256.hash(preimg3[0..], &left, sha256.Options{});
+    sha256.hash(preimg4[0..], internal_nodes[32..], sha256.Options{});
+    digest = sha256.init(sha256.Options{});
+    digest.update(left[0..]);
+    digest.update(internal_nodes[32..]);
+    digest.final(internal_nodes[32..]);
+
+    sha256.hash(internal_nodes[0..], &expected, sha256.Options{});
+
+    std.testing.expect(std.mem.eql(u8, hashed[0..], expected[0..]));
 }
