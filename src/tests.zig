@@ -3,6 +3,7 @@ const serialize = libssz.serialize;
 const deserialize = libssz.deserialize;
 const chunk_count = libssz.chunk_count;
 const hash_tree_root = libssz.hash_tree_root;
+const build_zeroes = libssz.build_zeroes;
 const std = @import("std");
 const ArrayList = std.ArrayList;
 const expect = std.testing.expect;
@@ -421,6 +422,7 @@ const d_bits = bytes_to_bits(16, d_bytes);
 const e_bits = bytes_to_bits(16, e_bytes);
 
 test "calculate the root hash of a boolean" {
+    build_zeroes();
     var expected = [_]u8{1} ++ [_]u8{0} ** 31;
     var hashed: [32]u8 = undefined;
     try hash_tree_root(bool, true, &hashed);
@@ -432,6 +434,7 @@ test "calculate the root hash of a boolean" {
 }
 
 test "calculate root hash of an array of two Bitvector[128]" {
+    build_zeroes();
     var deserialized: [2][128]bool = [2][128]bool{ a_bits, b_bits };
     var hashed: [32]u8 = undefined;
     try hash_tree_root(@TypeOf(deserialized), deserialized, &hashed);
@@ -444,6 +447,7 @@ test "calculate root hash of an array of two Bitvector[128]" {
 }
 
 test "calculate the root hash of an array of integers" {
+    build_zeroes();
     var expected = [_]u8{ 0xef, 0xbe, 0xad, 0xde, 0xfe, 0xca, 0xfe, 0xca } ++ [_]u8{0} ** 24;
     var hashed: [32]u8 = undefined;
     try hash_tree_root([2]u32, [_]u32{ 0xdeadbeef, 0xcafecafe }, &hashed);
@@ -451,6 +455,7 @@ test "calculate the root hash of an array of integers" {
 }
 
 test "calculate root hash of an array of three Bitvector[128]" {
+    build_zeroes();
     var deserialized: [3][128]bool = [3][128]bool{ a_bits, b_bits, c_bits };
     var hashed: [32]u8 = undefined;
     try hash_tree_root(@TypeOf(deserialized), deserialized, &hashed);
@@ -470,6 +475,7 @@ test "calculate root hash of an array of three Bitvector[128]" {
 }
 
 test "calculate the root hash of an array of five Bitvector[128]" {
+    build_zeroes();
     var deserialized = [5][128]bool{ a_bits, b_bits, c_bits, d_bits, e_bits };
     var hashed: [32]u8 = undefined;
     try hash_tree_root(@TypeOf(deserialized), deserialized, &hashed);
