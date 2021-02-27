@@ -451,17 +451,17 @@ test "next power of 2" {
 }
 
 // List of root hashes of zero-subtries, up to depth 255.
-var hash_of_zeros: [256][32]u8 = undefined;
+var hashes_of_zeros: [256][32]u8 = undefined;
 
 // builds the list of root hashes of zero subtrees.
 pub fn build_zeroes() void {
-    std.mem.copy(u8, &hash_of_zeros[0], zero_chunk[0..]);
+    std.mem.copy(u8, &hashes_of_zeros[0], zero_chunk[0..]);
     comptime var i = 1;
     inline while (i < 256) : (i += 1) {
         var digest = sha256.init(sha256.Options{});
-        digest.update(hash_of_zeros[i - 1][0..]);
-        digest.update(hash_of_zeros[i - 1][0..]);
-        digest.final(&hash_of_zeros[i]);
+        digest.update(hashes_of_zeros[i - 1][0..]);
+        digest.update(hashes_of_zeros[i - 1][0..]);
+        digest.final(&hashes_of_zeros[i]);
     }
 }
 
@@ -498,7 +498,7 @@ pub fn merkleize(chunks: []chunk, limit: ?usize, out: *[32]u8) void {
                 merkleize(chunks[size / 2 ..], size / 2, &buf);
                 digest.update(buf[0..]);
             } else
-                digest.update(hash_of_zeros[size / 2 - 1][0..]);
+                digest.update(hashes_of_zeros[size / 2 - 1][0..]);
             digest.final(out);
         },
     }
