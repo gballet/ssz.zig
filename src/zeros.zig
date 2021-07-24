@@ -264,7 +264,7 @@ pub const hashes_of_zero: [256][32]u8 = calc: {
     var ret: [256][32]u8 = undefined;
     comptime var i = 1;
     while (i < 256) : (i += 1) {
-        try std.fmt.hexToBytes(ret[i][0..], strs[i - 1]);
+        _ = comptime try std.fmt.hexToBytes(ret[i][0..], strs[i - 1]);
     }
 
     break :calc ret;

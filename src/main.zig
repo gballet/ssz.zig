@@ -248,9 +248,9 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                 if (@sizeOf(T) > 1) {
                     out.* <<= 8;
                 }
-                out.* |= switch (builtin.endian) {
+                out.* |= switch (builtin.cpu.arch.endian()) {
                     .Big => @as(T, serialized[i]),
-                    .Little => @as(T, serialized[N - i - 1]),
+                    else => @as(T, serialized[N - i - 1]),
                 };
             }
         },
@@ -345,12 +345,12 @@ test "mix_in_length" {
     var length: [32]u8 = undefined;
     var expected: [32]u8 = undefined;
     var mixin: [32]u8 = undefined;
-    try std.fmt.hexToBytes(root[0..], "2279cf111c15f2d594e7a0055e8735e7409e56ed4250735d6d2f2b0d1bcf8297");
-    try std.fmt.hexToBytes(length[0..], "deadbeef00000000000000000000000000000000000000000000000000000000");
-    try std.fmt.hexToBytes(expected[0..], "91bac5750e259d1ea683ff193334cbd1afb584e420964f678f9839076bb5f1e6");
+    _ = try std.fmt.hexToBytes(root[0..], "2279cf111c15f2d594e7a0055e8735e7409e56ed4250735d6d2f2b0d1bcf8297");
+    _ = try std.fmt.hexToBytes(length[0..], "deadbeef00000000000000000000000000000000000000000000000000000000");
+    _ = try std.fmt.hexToBytes(expected[0..], "91bac5750e259d1ea683ff193334cbd1afb584e420964f678f9839076bb5f1e6");
     mix_in_length(root, length, &mixin);
 
-    std.testing.expect(std.mem.eql(u8, mixin[0..], expected[0..]));
+    try std.testing.expect(std.mem.eql(u8, mixin[0..], expected[0..]));
 }
 
 /// Calculates the number of leaves needed for the merkelization
@@ -390,9 +390,9 @@ test "pack u32" {
     defer list.deinit();
     const out = try pack(u32, 0xdeadbeef, &list);
 
-    try std.fmt.hexToBytes(expected[0..], "efbeadde00000000000000000000000000000000000000000000000000000000");
+    _ = try std.fmt.hexToBytes(expected[0..], "efbeadde00000000000000000000000000000000000000000000000000000000");
 
-    std.testing.expect(std.mem.eql(u8, out[0][0..], expected[0..]));
+    try std.testing.expect(std.mem.eql(u8, out[0][0..], expected[0..]));
 }
 
 test "pack bool" {
@@ -401,9 +401,9 @@ test "pack bool" {
     defer list.deinit();
     const out = try pack(bool, true, &list);
 
-    try std.fmt.hexToBytes(expected[0..], "0100000000000000000000000000000000000000000000000000000000000000");
+    _ = try std.fmt.hexToBytes(expected[0..], "0100000000000000000000000000000000000000000000000000000000000000");
 
-    std.testing.expect(std.mem.eql(u8, out[0][0..], expected[0..]));
+    try std.testing.expect(std.mem.eql(u8, out[0][0..], expected[0..]));
 }
 
 test "pack string" {
@@ -412,13 +412,13 @@ test "pack string" {
     defer list.deinit();
     const out = try pack([]const u8, "a" ** 100, &list);
 
-    try std.fmt.hexToBytes(expected[0..], "6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616100000000000000000000000000000000000000000000000000000000");
+    _ = try std.fmt.hexToBytes(expected[0..], "6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616100000000000000000000000000000000000000000000000000000000");
 
-    std.testing.expect(expected.len == out.len * out[0].len);
-    std.testing.expect(std.mem.eql(u8, out[0][0..], expected[0..32]));
-    std.testing.expect(std.mem.eql(u8, out[1][0..], expected[32..64]));
-    std.testing.expect(std.mem.eql(u8, out[2][0..], expected[64..96]));
-    std.testing.expect(std.mem.eql(u8, out[3][0..], expected[96..]));
+    try std.testing.expect(expected.len == out.len * out[0].len);
+    try std.testing.expect(std.mem.eql(u8, out[0][0..], expected[0..32]));
+    try std.testing.expect(std.mem.eql(u8, out[1][0..], expected[32..64]));
+    try std.testing.expect(std.mem.eql(u8, out[2][0..], expected[64..96]));
+    try std.testing.expect(std.mem.eql(u8, out[3][0..], expected[96..]));
 }
 
 fn next_pow_of_two(len: usize) !usize {
@@ -439,16 +439,16 @@ fn next_pow_of_two(len: usize) !usize {
 
 test "next power of 2" {
     var out = try next_pow_of_two(0b1);
-    std.testing.expect(out == 1);
+    try std.testing.expect(out == 1);
     out = try next_pow_of_two(0b10);
-    std.testing.expect(out == 2);
+    try std.testing.expect(out == 2);
     out = try next_pow_of_two(0b11);
-    std.testing.expect(out == 4);
+    try std.testing.expect(out == 4);
 
     // special cases
     out = try next_pow_of_two(0);
-    std.testing.expect(out == 0);
-    std.testing.expectError(error.OverflowsUSize, next_pow_of_two(std.math.maxInt(usize)));
+    try std.testing.expect(out == 0);
+    try std.testing.expectError(error.OverflowsUSize, next_pow_of_two(std.math.maxInt(usize)));
 }
 
 // merkleize recursively calculates the root hash of a Merkle tree.
@@ -483,8 +483,7 @@ pub fn merkleize(chunks: []chunk, limit: ?usize, out: *[32]u8) void {
             if (size / 2 < chunks.len) {
                 merkleize(chunks[size / 2 ..], size / 2, &buf);
                 digest.update(buf[0..]);
-            } else
-                digest.update(hashes_of_zero[size / 2 - 1][0..]);
+            } else digest.update(hashes_of_zero[size / 2 - 1][0..]);
             digest.final(out);
         },
     }
@@ -515,7 +514,7 @@ test "merkleize a string" {
     hasher.update(internal_right[0..]);
     hasher.final(&root);
 
-    std.testing.expect(std.mem.eql(u8, out[0..], root[0..]));
+    try std.testing.expect(std.mem.eql(u8, out[0..], root[0..]));
 }
 
 test "merkleize a boolean" {
@@ -527,7 +526,7 @@ test "merkleize a boolean" {
     var out: [BYTES_PER_CHUNK]u8 = undefined;
     merkleize(chunks, null, &out);
 
-    std.testing.expect(std.mem.eql(u8, out[0..], expected[0..]));
+    try std.testing.expect(std.mem.eql(u8, out[0..], expected[0..]));
 
     var list2 = ArrayList(u8).init(std.testing.allocator);
     defer list2.deinit();
@@ -535,8 +534,9 @@ test "merkleize a boolean" {
     chunks = try pack(bool, true, &list2);
     expected[0] = 1;
     merkleize(chunks, null, &out);
-    std.testing.expect(std.mem.eql(u8, out[0..], expected[0..]));
+    try std.testing.expect(std.mem.eql(u8, out[0..], expected[0..]));
 }
+
 test "merkleize a bytes16 vector with one element" {
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
@@ -544,7 +544,7 @@ test "merkleize a bytes16 vector with one element" {
     var expected: [32]u8 = [_]u8{0xaa} ** 16 ++ [_]u8{0x00} ** 16;
     var out: [32]u8 = undefined;
     merkleize(chunks, null, &out);
-    std.testing.expect(std.mem.eql(u8, out[0..], expected[0..]));
+    try std.testing.expect(std.mem.eql(u8, out[0..], expected[0..]));
 }
 
 fn pack_bits(bits: []const bool, l: *ArrayList(u8)) ![]chunk {
