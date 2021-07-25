@@ -2,7 +2,7 @@ version: 2.1
 jobs:
   lint:
     docker:
-      - image: euantorano/zig:latest
+      - image: euantorano/zig:0.8.0
     working_directory: ~/repo
     steps:
       - checkout
