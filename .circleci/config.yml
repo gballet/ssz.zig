@@ -12,7 +12,7 @@ jobs:
             zig fmt --check src/main.zig
   test_latest:
     docker:
-      - image: euantorano/zig:latest
+      - image: euantorano/zig:0.8.0
     working_directory: ~/repo
     steps:
       - checkout
