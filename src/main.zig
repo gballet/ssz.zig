@@ -606,6 +606,23 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8) !void {
                 else => return error.NotSupported,
             }
         },
+        .Pointer => {
+            switch (type_info.Pointer.size) {
+                .One => hash_tree_root(type_info.Pointer.child, value.*, out),
+                .Slice => {
+                    switch (@typeInfo(type_info.Pointer.child)) {
+                        .Int => {
+                            var list = ArrayList(u8).init(std.testing.allocator);
+                            defer list.deinit();
+                            var chunks = try pack(T, value, &list);
+                            merkleize(chunks, null, out);
+                        },
+                        else => return error.UnSupportedPointerType,
+                    }
+                },
+                else => return error.UnSupportedPointerType,
+            }
+        },
         else => return error.NotSupported,
     }
 }
