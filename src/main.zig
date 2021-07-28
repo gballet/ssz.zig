@@ -623,6 +623,17 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8) !void {
                 else => return error.UnSupportedPointerType,
             }
         },
+        .Struct => {
+            // XXX allocator
+            var chunks = ArrayList(chunk).init(std.testing.allocator);
+            defer chunks.deinit();
+            var tmp: chunk = undefined;
+            inline for (type_info.Struct.fields) |f| {
+                try hash_tree_root(f.field_type, @field(value, f.name), &tmp);
+                try chunks.append(tmp);
+            }
+            merkleize(chunks.items, null, out);
+        },
         else => return error.NotSupported,
     }
 }

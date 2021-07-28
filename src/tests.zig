@@ -500,3 +500,22 @@ test "calculate the root hash of an array of five Bitvector[128]" {
 
     try std.testing.expect(std.mem.eql(u8, hashed[0..], expected[0..]));
 }
+const Fork = struct {
+    previous_version: [4]u8,
+    current_version: [4]u8,
+    epoch: u64,
+};
+
+test "calculate the root hash of a structure" {
+    var hashed: [32]u8 = undefined;
+    const fork = Fork{
+        .previous_version = [_]u8{ 0x9c, 0xe2, 0x5d, 0x26 },
+        .current_version = [_]u8{ 0x36, 0x90, 0x55, 0x93 },
+        .epoch = 3,
+    };
+    var expected: [32]u8 = undefined;
+    _ = try std.fmt.hexToBytes(expected[0..], "58316a908701d3660123f0b8cb7839abdd961f71d92993d34e4f480fbec687d9");
+    try hash_tree_root(Fork, fork, &hashed);
+    try std.testing.expect(std.mem.eql(u8, hashed[0..], expected[0..]));
+}
+
