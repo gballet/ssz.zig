@@ -423,18 +423,18 @@ const e_bits = bytes_to_bits(16, e_bytes);
 test "calculate the root hash of a boolean" {
     var expected = [_]u8{1} ++ [_]u8{0} ** 31;
     var hashed: [32]u8 = undefined;
-    try hash_tree_root(bool, true, &hashed);
+    try hash_tree_root(bool, true, &hashed, std.testing.allocator);
     try expect(std.mem.eql(u8, hashed[0..], expected[0..]));
 
     expected = [_]u8{0} ** 32;
-    try hash_tree_root(bool, false, &hashed);
+    try hash_tree_root(bool, false, &hashed, std.testing.allocator);
     try expect(std.mem.eql(u8, hashed[0..], expected[0..]));
 }
 
 test "calculate root hash of an array of two Bitvector[128]" {
     var deserialized: [2][128]bool = [2][128]bool{ a_bits, b_bits };
     var hashed: [32]u8 = undefined;
-    try hash_tree_root(@TypeOf(deserialized), deserialized, &hashed);
+    try hash_tree_root(@TypeOf(deserialized), deserialized, &hashed, std.testing.allocator);
 
     var expected: [32]u8 = undefined;
     const expected_preimage = a_bytes ++ empty_bytes ++ b_bytes ++ empty_bytes;
@@ -446,14 +446,14 @@ test "calculate root hash of an array of two Bitvector[128]" {
 test "calculate the root hash of an array of integers" {
     var expected = [_]u8{ 0xef, 0xbe, 0xad, 0xde, 0xfe, 0xca, 0xfe, 0xca } ++ [_]u8{0} ** 24;
     var hashed: [32]u8 = undefined;
-    try hash_tree_root([2]u32, [_]u32{ 0xdeadbeef, 0xcafecafe }, &hashed);
+    try hash_tree_root([2]u32, [_]u32{ 0xdeadbeef, 0xcafecafe }, &hashed, std.testing.allocator);
     try expect(std.mem.eql(u8, hashed[0..], expected[0..]));
 }
 
 test "calculate root hash of an array of three Bitvector[128]" {
     var deserialized: [3][128]bool = [3][128]bool{ a_bits, b_bits, c_bits };
     var hashed: [32]u8 = undefined;
-    try hash_tree_root(@TypeOf(deserialized), deserialized, &hashed);
+    try hash_tree_root(@TypeOf(deserialized), deserialized, &hashed, std.testing.allocator);
 
     var left: [32]u8 = undefined;
     var expected: [32]u8 = undefined;
@@ -472,7 +472,7 @@ test "calculate root hash of an array of three Bitvector[128]" {
 test "calculate the root hash of an array of five Bitvector[128]" {
     var deserialized = [5][128]bool{ a_bits, b_bits, c_bits, d_bits, e_bits };
     var hashed: [32]u8 = undefined;
-    try hash_tree_root(@TypeOf(deserialized), deserialized, &hashed);
+    try hash_tree_root(@TypeOf(deserialized), deserialized, &hashed, std.testing.allocator);
 
     var internal_nodes: [64]u8 = undefined;
     var left: [32]u8 = undefined;
@@ -516,7 +516,7 @@ test "calculate the root hash of a structure" {
     };
     var expected: [32]u8 = undefined;
     _ = try std.fmt.hexToBytes(expected[0..], "58316a908701d3660123f0b8cb7839abdd961f71d92993d34e4f480fbec687d9");
-    try hash_tree_root(Fork, fork, &hashed);
+    try hash_tree_root(Fork, fork, &hashed, std.testing.allocator);
     try expect(std.mem.eql(u8, hashed[0..], expected[0..]));
 }
 

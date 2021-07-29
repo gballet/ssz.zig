@@ -6,6 +6,7 @@ const ArrayList = std.ArrayList;
 const builtin = std.builtin;
 const sha256 = std.crypto.hash.sha2.Sha256;
 const hashes_of_zero = @import("./zeros.zig").hashes_of_zero;
+const Allocator = std.mem.Allocator;
 
 /// Number of bytes per chunk.
 const BYTES_PER_CHUNK = 32;
@@ -566,11 +567,11 @@ fn pack_bits(bits: []const bool, l: *ArrayList(u8)) ![]chunk {
     return std.mem.bytesAsSlice(chunk, l.items);
 }
 
-pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8) !void {
+pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8, allctr: *Allocator) !void {
     const type_info = @typeInfo(T);
     switch (type_info) {
         .Int, .Bool => {
-            var list = ArrayList(u8).init(std.testing.allocator);
+            var list = ArrayList(u8).init(allctr);
             defer list.deinit();
             var chunks = try pack(T, value, &list);
             merkleize(chunks, null, out);
@@ -582,23 +583,23 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8) !void {
             // are the merkle roots of its elements.
             switch (@typeInfo(type_info.Array.child)) {
                 .Int => {
-                    var list = ArrayList(u8).init(std.testing.allocator);
+                    var list = ArrayList(u8).init(allctr);
                     defer list.deinit();
                     var chunks = try pack(T, value, &list);
                     merkleize(chunks, null, out);
                 },
                 .Bool => {
-                    var list = ArrayList(u8).init(std.testing.allocator);
+                    var list = ArrayList(u8).init(allctr);
                     defer list.deinit();
                     var chunks = try pack_bits(value[0..], &list);
                     merkleize(chunks, chunk_count(T), out);
                 },
                 .Array => {
-                    var chunks = ArrayList(chunk).init(std.testing.allocator);
+                    var chunks = ArrayList(chunk).init(allctr);
                     defer chunks.deinit();
                     var tmp: chunk = undefined;
                     for (value) |item| {
-                        try hash_tree_root(@TypeOf(item), item, &tmp);
+                        try hash_tree_root(@TypeOf(item), item, &tmp, allctr);
                         try chunks.append(tmp);
                     }
                     merkleize(chunks.items, null, out);
@@ -608,11 +609,11 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8) !void {
         },
         .Pointer => {
             switch (type_info.Pointer.size) {
-                .One => hash_tree_root(type_info.Pointer.child, value.*, out),
+                .One => hash_tree_root(type_info.Pointer.child, value.*, out, allctr),
                 .Slice => {
                     switch (@typeInfo(type_info.Pointer.child)) {
                         .Int => {
-                            var list = ArrayList(u8).init(std.testing.allocator);
+                            var list = ArrayList(u8).init(allctr);
                             defer list.deinit();
                             var chunks = try pack(T, value, &list);
                             merkleize(chunks, null, out);
@@ -624,12 +625,11 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8) !void {
             }
         },
         .Struct => {
-            // XXX allocator
-            var chunks = ArrayList(chunk).init(std.testing.allocator);
+            var chunks = ArrayList(chunk).init(allctr);
             defer chunks.deinit();
             var tmp: chunk = undefined;
             inline for (type_info.Struct.fields) |f| {
-                try hash_tree_root(f.field_type, @field(value, f.name), &tmp);
+                try hash_tree_root(f.field_type, @field(value, f.name), &tmp, allctr);
                 try chunks.append(tmp);
             }
             merkleize(chunks.items, null, out);
