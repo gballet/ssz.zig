@@ -335,7 +335,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
 }
 
 fn mix_in_length(root: [32]u8, length: [32]u8, out: *[32]u8) void {
-    var hasher = std.crypto.hash.sha3.Sha3_256.init(std.crypto.hash.sha3.Sha3_256.Options{});
+    var hasher = sha256.init(sha256.Options{});
     hasher.update(root[0..]);
     hasher.update(length[0..]);
     hasher.final(out[0..]);
@@ -348,7 +348,7 @@ test "mix_in_length" {
     var mixin: [32]u8 = undefined;
     _ = try std.fmt.hexToBytes(root[0..], "2279cf111c15f2d594e7a0055e8735e7409e56ed4250735d6d2f2b0d1bcf8297");
     _ = try std.fmt.hexToBytes(length[0..], "deadbeef00000000000000000000000000000000000000000000000000000000");
-    _ = try std.fmt.hexToBytes(expected[0..], "91bac5750e259d1ea683ff193334cbd1afb584e420964f678f9839076bb5f1e6");
+    _ = try std.fmt.hexToBytes(expected[0..], "0b665dda6e4c269730bc4bbe3e990a69d37fa82892bac5fe055ca4f02a98c900");
     mix_in_length(root, length, &mixin);
 
     try std.testing.expect(std.mem.eql(u8, mixin[0..], expected[0..]));
