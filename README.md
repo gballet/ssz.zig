@@ -49,6 +49,8 @@ Supported types:
  * `boolean`
  * `uintN`
  * `Vector[N]`
+ * structures
+ * strings
 
 ## Contributing
 
