@@ -354,6 +354,26 @@ test "mix_in_length" {
     try std.testing.expect(std.mem.eql(u8, mixin[0..], expected[0..]));
 }
 
+fn mix_in_selector(root: [32]u8, comptime selector: usize, out: *[32]u8) void {
+    var hasher = sha256.init(sha256.Options{});
+    hasher.update(root[0..]);
+    var tmp = [_]u8{0} ** 32;
+    std.mem.writeIntLittle(@TypeOf(selector), tmp[0..@sizeOf(@TypeOf(selector))], selector);
+    hasher.update(tmp[0..]);
+    hasher.final(out[0..]);
+}
+
+test "mix_in_selector" {
+    var root: [32]u8 = undefined;
+    var expected: [32]u8 = undefined;
+    var mixin: [32]u8 = undefined;
+    _ = try std.fmt.hexToBytes(root[0..], "2279cf111c15f2d594e7a0055e8735e7409e56ed4250735d6d2f2b0d1bcf8297");
+    _ = try std.fmt.hexToBytes(expected[0..], "c483cb731afcfe9f2c596698eaca1c4e0dcb4a1136297adef74c31c268966eb5");
+    mix_in_selector(root, 25, &mixin);
+
+    try std.testing.expect(std.mem.eql(u8, mixin[0..], expected[0..]));
+}
+
 /// Calculates the number of leaves needed for the merkelization
 /// of this type.
 pub fn chunk_count(comptime T: type) usize {
@@ -633,6 +653,15 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8, allctr: *Allocat
                 try chunks.append(tmp);
             }
             merkleize(chunks.items, null, out);
+        },
+        // An optional is a union with `None` as first value.
+        .Optional => if (value != null) {
+            var tmp: chunk = undefined;
+            try hash_tree_root(type_info.Optional.child, value.?, &tmp, allctr);
+            mix_in_selector(tmp, 1, out);
+        } else {
+            var tmp: chunk = undefined;
+            mix_in_selector(zero_chunk, 0, out);
         },
         else => return error.NotSupported,
     }

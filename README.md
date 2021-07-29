@@ -51,6 +51,7 @@ Supported types:
  * `Vector[N]`
  * structures
  * strings
+ * optionals
 
 ## Contributing
 

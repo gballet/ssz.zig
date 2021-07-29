@@ -520,3 +520,20 @@ test "calculate the root hash of a structure" {
     try expect(std.mem.eql(u8, hashed[0..], expected[0..]));
 }
 
+test "calculate the root hash of an Optional" {
+    var hashed: [32]u8 = undefined;
+    var payload: [64]u8 = undefined;
+    const v: ?u32 = null;
+    const u: ?u32 = 0xdeadbeef;
+    var expected: [32]u8 = undefined;
+
+    _ = try std.fmt.hexToBytes(payload[0..], "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+    sha256.hash(payload[0..], expected[0..], sha256.Options{});
+    try hash_tree_root(?u32, v, &hashed, std.testing.allocator);
+    try expect(std.mem.eql(u8, hashed[0..], expected[0..]));
+
+    _ = try std.fmt.hexToBytes(payload[0..], "efbeadde000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000");
+    sha256.hash(payload[0..], expected[0..], sha256.Options{});
+    try hash_tree_root(?u32, u, &hashed, std.testing.allocator);
+    try expect(std.mem.eql(u8, hashed[0..], expected[0..]));
+}
