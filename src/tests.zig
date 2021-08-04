@@ -537,3 +537,23 @@ test "calculate the root hash of an Optional" {
     try hash_tree_root(?u32, u, &hashed, std.testing.allocator);
     try expect(std.mem.eql(u8, hashed[0..], expected[0..]));
 }
+
+test "calculate the root hash of an union" {
+    const Payload = union(enum) {
+        int: u64,
+        boolean: bool,
+    };
+    var out: [32]u8 = undefined;
+    var payload: [64]u8 = undefined;
+    _ = try std.fmt.hexToBytes(payload[0..], "d2040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+    var exp1: [32]u8 = undefined;
+    sha256.hash(payload[0..], exp1[0..], sha256.Options{});
+    try hash_tree_root(Payload, Payload{ .int = 1234 }, &out, std.testing.allocator);
+    try expect(std.mem.eql(u8, out[0..], exp1[0..]));
+
+    var exp2: [32]u8 = undefined;
+    _ = try std.fmt.hexToBytes(payload[0..], "01000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000");
+    sha256.hash(payload[0..], exp2[0..], sha256.Options{});
+    try hash_tree_root(Payload, Payload{ .boolean = true }, &out, std.testing.allocator);
+    try expect(std.mem.eql(u8, out[0..], exp2[0..]));
+}

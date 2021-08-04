@@ -663,6 +663,18 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8, allctr: *Allocat
             var tmp: chunk = undefined;
             mix_in_selector(zero_chunk, 0, out);
         },
+        .Union => {
+            if (type_info.Union.tag_type == null) {
+                return error.UnionIsNotTagged;
+            }
+            inline for (type_info.Union.fields) |f, index| {
+                if (@enumToInt(value) == index) {
+                    var tmp: chunk = undefined;
+                    try hash_tree_root(f.field_type, @field(value, f.name), &tmp, allctr);
+                    mix_in_selector(tmp, index, out);
+                }
+            }
+        },
         else => return error.NotSupported,
     }
 }

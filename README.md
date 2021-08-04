@@ -52,6 +52,7 @@ Supported types:
  * structures
  * strings
  * optionals
+ * unions
 
 ## Contributing
 
