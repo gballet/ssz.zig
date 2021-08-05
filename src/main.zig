@@ -473,16 +473,12 @@ test "next power of 2" {
 }
 
 // merkleize recursively calculates the root hash of a Merkle tree.
-// As of 0.7.0, zig doesn't handle error unions in recursive funcs,
-// so the function will panic if it encounters an error.
-pub fn merkleize(chunks: []chunk, limit: ?usize, out: *[32]u8) void {
+pub fn merkleize(chunks: []chunk, limit: ?usize, out: *[32]u8) anyerror!void {
     // Calculate the number of chunks to be padded, check the limit
-    // zig doesn't currently support error unions in recursive functions,
-    // so panic instead.
     if (limit != null and chunks.len > limit.?) {
-        @panic("chunks size exceeds limit");
+        return error.ChunkSizeExceedsLimit;
     }
-    var size = next_pow_of_two(limit orelse chunks.len) catch @panic("error in calculating next power of two");
+    var size = try next_pow_of_two(limit orelse chunks.len);
 
     // Perform the merkelization
     switch (size) {
@@ -495,14 +491,14 @@ pub fn merkleize(chunks: []chunk, limit: ?usize, out: *[32]u8) void {
             var digest = sha256.init(sha256.Options{});
             var buf: [32]u8 = undefined;
             const split = if (size / 2 < chunks.len) size / 2 else chunks.len;
-            merkleize(chunks[0..split], size / 2, &buf);
+            try merkleize(chunks[0..split], size / 2, &buf);
             digest.update(buf[0..]);
 
             // Merkleize the right side. If the number of chunks only
             // covers the first half, directly input the hashed zero-
             // filled subtrie.
             if (size / 2 < chunks.len) {
-                merkleize(chunks[size / 2 ..], size / 2, &buf);
+                try merkleize(chunks[size / 2 ..], size / 2, &buf);
                 digest.update(buf[0..]);
             } else digest.update(hashes_of_zero[size / 2 - 1][0..]);
             digest.final(out);
@@ -515,7 +511,7 @@ test "merkleize a string" {
     defer list.deinit();
     var chunks = try pack([]const u8, "a" ** 100, &list);
     var out: [32]u8 = undefined;
-    merkleize(chunks, null, &out);
+    try merkleize(chunks, null, &out);
     // Build the expected tree
     const leaf1 = [_]u8{0x61} ** 32; // "0xaaaaa....aa" 32 times
     var leaf2: [32]u8 = [_]u8{0x61} ** 4 ++ [_]u8{0} ** 28;
@@ -545,7 +541,7 @@ test "merkleize a boolean" {
     var chunks = try pack(bool, false, &list);
     var expected = [_]u8{0} ** BYTES_PER_CHUNK;
     var out: [BYTES_PER_CHUNK]u8 = undefined;
-    merkleize(chunks, null, &out);
+    try merkleize(chunks, null, &out);
 
     try std.testing.expect(std.mem.eql(u8, out[0..], expected[0..]));
 
@@ -554,7 +550,7 @@ test "merkleize a boolean" {
 
     chunks = try pack(bool, true, &list2);
     expected[0] = 1;
-    merkleize(chunks, null, &out);
+    try merkleize(chunks, null, &out);
     try std.testing.expect(std.mem.eql(u8, out[0..], expected[0..]));
 }
 
@@ -564,7 +560,7 @@ test "merkleize a bytes16 vector with one element" {
     var chunks = try pack([16]u8, [_]u8{0xaa} ** 16, &list);
     var expected: [32]u8 = [_]u8{0xaa} ** 16 ++ [_]u8{0x00} ** 16;
     var out: [32]u8 = undefined;
-    merkleize(chunks, null, &out);
+    try merkleize(chunks, null, &out);
     try std.testing.expect(std.mem.eql(u8, out[0..], expected[0..]));
 }
 
@@ -594,7 +590,7 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8, allctr: *Allocat
             var list = ArrayList(u8).init(allctr);
             defer list.deinit();
             var chunks = try pack(T, value, &list);
-            merkleize(chunks, null, out);
+            try merkleize(chunks, null, out);
         },
         .Array => {
             // Check if the child is a basic type. If so, return
@@ -606,13 +602,13 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8, allctr: *Allocat
                     var list = ArrayList(u8).init(allctr);
                     defer list.deinit();
                     var chunks = try pack(T, value, &list);
-                    merkleize(chunks, null, out);
+                    try merkleize(chunks, null, out);
                 },
                 .Bool => {
                     var list = ArrayList(u8).init(allctr);
                     defer list.deinit();
                     var chunks = try pack_bits(value[0..], &list);
-                    merkleize(chunks, chunk_count(T), out);
+                    try merkleize(chunks, chunk_count(T), out);
                 },
                 .Array => {
                     var chunks = ArrayList(chunk).init(allctr);
@@ -622,7 +618,7 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8, allctr: *Allocat
                         try hash_tree_root(@TypeOf(item), item, &tmp, allctr);
                         try chunks.append(tmp);
                     }
-                    merkleize(chunks.items, null, out);
+                    try merkleize(chunks.items, null, out);
                 },
                 else => return error.NotSupported,
             }
@@ -652,7 +648,7 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8, allctr: *Allocat
                 try hash_tree_root(f.field_type, @field(value, f.name), &tmp, allctr);
                 try chunks.append(tmp);
             }
-            merkleize(chunks.items, null, out);
+            try merkleize(chunks.items, null, out);
         },
         // An optional is a union with `None` as first value.
         .Optional => if (value != null) {
