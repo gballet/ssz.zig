@@ -17,37 +17,37 @@ const BYTES_PER_LENGTH_OFFSET = 4;
 // Determine the serialized size of an object so that
 // the code serializing of variable-size objects can
 // determine the offset to the next object.
-fn serialized_size(comptime T: type, data: T) !usize {
+fn serializedSize(comptime T: type, data: T) !usize {
     const info = @typeInfo(T);
     return switch (info) {
         .Array => data.len,
         .Pointer => switch (info.Pointer.size) {
             .Slice => data.len,
-            else => serialized_size(info.Pointer.child, data.*),
+            else => serializedSize(info.Pointer.child, data.*),
         },
         .Optional => if (data == null)
             @as(usize, 0)
         else
-            serialized_size(info.Optional.child, data.?),
+            serializedSize(info.Optional.child, data.?),
         .Null => @as(usize, 0),
         else => error.NoSerializedSizeAvailable,
     };
 }
 
 /// Returns true if an object is of fixed size
-fn is_fixed_size_object(comptime T: type) !bool {
+fn isFixedSizeObject(comptime T: type) !bool {
     const info = @typeInfo(T);
     switch (info) {
         .Bool, .Int, .Null => return true,
         .Array => return false,
         .Struct => inline for (info.Struct.fields) |field| {
-            if (!try is_fixed_size_object(field.field_type)) {
+            if (!try isFixedSizeObject(field.field_type)) {
                 return false;
             }
         },
         .Pointer => switch (info.Pointer.size) {
             .Many, .Slice, .C => return false,
-            .One => return is_fixed_size_object(info.Pointer.child),
+            .One => return isFixedSizeObject(info.Pointer.child),
         },
         else => return error.UnknownType,
     }
@@ -83,7 +83,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                 // If the item type is fixed-size, serialize inline,
                 // otherwise, create an array of offsets and then
                 // serialize each object afterwards.
-                if (try is_fixed_size_object(info.Array.child)) {
+                if (try isFixedSizeObject(info.Array.child)) {
                     for (data) |item| {
                         try serialize(info.Array.child, item, l);
                     }
@@ -155,7 +155,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                     },
                     else => {
                         try serialize(u32, @truncate(u32, var_acc), l);
-                        var_acc += try serialized_size(field.field_type, @field(data, field.name));
+                        var_acc += try serializedSize(field.field_type, @field(data, field.name));
                     },
                 }
             }
@@ -214,7 +214,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                 }
             } else {
                 comptime const U = info.Array.child;
-                if (try is_fixed_size_object(U)) {
+                if (try isFixedSizeObject(U)) {
                     comptime var i = 0;
                     comptime const pitch = @sizeOf(U);
                     inline while (i < out.len) : (i += pitch) {
@@ -334,14 +334,14 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
     }
 }
 
-fn mix_in_length(root: [32]u8, length: [32]u8, out: *[32]u8) void {
+fn mixInLength(root: [32]u8, length: [32]u8, out: *[32]u8) void {
     var hasher = sha256.init(sha256.Options{});
     hasher.update(root[0..]);
     hasher.update(length[0..]);
     hasher.final(out[0..]);
 }
 
-test "mix_in_length" {
+test "mixInLength" {
     var root: [32]u8 = undefined;
     var length: [32]u8 = undefined;
     var expected: [32]u8 = undefined;
@@ -349,12 +349,12 @@ test "mix_in_length" {
     _ = try std.fmt.hexToBytes(root[0..], "2279cf111c15f2d594e7a0055e8735e7409e56ed4250735d6d2f2b0d1bcf8297");
     _ = try std.fmt.hexToBytes(length[0..], "deadbeef00000000000000000000000000000000000000000000000000000000");
     _ = try std.fmt.hexToBytes(expected[0..], "0b665dda6e4c269730bc4bbe3e990a69d37fa82892bac5fe055ca4f02a98c900");
-    mix_in_length(root, length, &mixin);
+    mixInLength(root, length, &mixin);
 
     try std.testing.expect(std.mem.eql(u8, mixin[0..], expected[0..]));
 }
 
-fn mix_in_selector(root: [32]u8, comptime selector: usize, out: *[32]u8) void {
+fn mixInSelector(root: [32]u8, comptime selector: usize, out: *[32]u8) void {
     var hasher = sha256.init(sha256.Options{});
     hasher.update(root[0..]);
     var tmp = [_]u8{0} ** 32;
@@ -363,24 +363,24 @@ fn mix_in_selector(root: [32]u8, comptime selector: usize, out: *[32]u8) void {
     hasher.final(out[0..]);
 }
 
-test "mix_in_selector" {
+test "mixInSelector" {
     var root: [32]u8 = undefined;
     var expected: [32]u8 = undefined;
     var mixin: [32]u8 = undefined;
     _ = try std.fmt.hexToBytes(root[0..], "2279cf111c15f2d594e7a0055e8735e7409e56ed4250735d6d2f2b0d1bcf8297");
     _ = try std.fmt.hexToBytes(expected[0..], "c483cb731afcfe9f2c596698eaca1c4e0dcb4a1136297adef74c31c268966eb5");
-    mix_in_selector(root, 25, &mixin);
+    mixInSelector(root, 25, &mixin);
 
     try std.testing.expect(std.mem.eql(u8, mixin[0..], expected[0..]));
 }
 
 /// Calculates the number of leaves needed for the merkelization
 /// of this type.
-pub fn chunk_count(comptime T: type) usize {
+pub fn chunkCount(comptime T: type) usize {
     const info = @typeInfo(T);
     switch (info) {
         .Int, .Bool => return 1,
-        .Pointer => return chunk_count(info.Pointer.child),
+        .Pointer => return chunkCount(info.Pointer.child),
         // the chunk size of an array depends on its type
         .Array => switch (@typeInfo(info.Array.child)) {
             // Bitvector[N]
@@ -442,7 +442,7 @@ test "pack string" {
     try std.testing.expect(std.mem.eql(u8, out[3][0..], expected[96..]));
 }
 
-fn next_pow_of_two(len: usize) !usize {
+fn nextPowOfTwo(len: usize) !usize {
     if (len == 0) {
         return @as(usize, 0);
     }
@@ -459,17 +459,17 @@ fn next_pow_of_two(len: usize) !usize {
 }
 
 test "next power of 2" {
-    var out = try next_pow_of_two(0b1);
+    var out = try nextPowOfTwo(0b1);
     try std.testing.expect(out == 1);
-    out = try next_pow_of_two(0b10);
+    out = try nextPowOfTwo(0b10);
     try std.testing.expect(out == 2);
-    out = try next_pow_of_two(0b11);
+    out = try nextPowOfTwo(0b11);
     try std.testing.expect(out == 4);
 
     // special cases
-    out = try next_pow_of_two(0);
+    out = try nextPowOfTwo(0);
     try std.testing.expect(out == 0);
-    try std.testing.expectError(error.OverflowsUSize, next_pow_of_two(std.math.maxInt(usize)));
+    try std.testing.expectError(error.OverflowsUSize, nextPowOfTwo(std.math.maxInt(usize)));
 }
 
 // merkleize recursively calculates the root hash of a Merkle tree.
@@ -478,7 +478,7 @@ pub fn merkleize(chunks: []chunk, limit: ?usize, out: *[32]u8) anyerror!void {
     if (limit != null and chunks.len > limit.?) {
         return error.ChunkSizeExceedsLimit;
     }
-    var size = try next_pow_of_two(limit orelse chunks.len);
+    var size = try nextPowOfTwo(limit orelse chunks.len);
 
     // Perform the merkelization
     switch (size) {
@@ -564,7 +564,7 @@ test "merkleize a bytes16 vector with one element" {
     try std.testing.expect(std.mem.eql(u8, out[0..], expected[0..]));
 }
 
-fn pack_bits(bits: []const bool, l: *ArrayList(u8)) ![]chunk {
+fn packBits(bits: []const bool, l: *ArrayList(u8)) ![]chunk {
     var byte: u8 = 0;
     for (bits) |bit, bitidx| {
         if (bit) {
@@ -583,7 +583,7 @@ fn pack_bits(bits: []const bool, l: *ArrayList(u8)) ![]chunk {
     return std.mem.bytesAsSlice(chunk, l.items);
 }
 
-pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8, allctr: *Allocator) !void {
+pub fn hashTreeRoot(comptime T: type, value: T, out: *[32]u8, allctr: *Allocator) !void {
     const type_info = @typeInfo(T);
     switch (type_info) {
         .Int, .Bool => {
@@ -607,15 +607,15 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8, allctr: *Allocat
                 .Bool => {
                     var list = ArrayList(u8).init(allctr);
                     defer list.deinit();
-                    var chunks = try pack_bits(value[0..], &list);
-                    try merkleize(chunks, chunk_count(T), out);
+                    var chunks = try packBits(value[0..], &list);
+                    try merkleize(chunks, chunkCount(T), out);
                 },
                 .Array => {
                     var chunks = ArrayList(chunk).init(allctr);
                     defer chunks.deinit();
                     var tmp: chunk = undefined;
                     for (value) |item| {
-                        try hash_tree_root(@TypeOf(item), item, &tmp, allctr);
+                        try hashTreeRoot(@TypeOf(item), item, &tmp, allctr);
                         try chunks.append(tmp);
                     }
                     try merkleize(chunks.items, null, out);
@@ -625,7 +625,7 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8, allctr: *Allocat
         },
         .Pointer => {
             switch (type_info.Pointer.size) {
-                .One => hash_tree_root(type_info.Pointer.child, value.*, out, allctr),
+                .One => hashTreeRoot(type_info.Pointer.child, value.*, out, allctr),
                 .Slice => {
                     switch (@typeInfo(type_info.Pointer.child)) {
                         .Int => {
@@ -645,7 +645,7 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8, allctr: *Allocat
             defer chunks.deinit();
             var tmp: chunk = undefined;
             inline for (type_info.Struct.fields) |f| {
-                try hash_tree_root(f.field_type, @field(value, f.name), &tmp, allctr);
+                try hashTreeRoot(f.field_type, @field(value, f.name), &tmp, allctr);
                 try chunks.append(tmp);
             }
             try merkleize(chunks.items, null, out);
@@ -653,11 +653,11 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8, allctr: *Allocat
         // An optional is a union with `None` as first value.
         .Optional => if (value != null) {
             var tmp: chunk = undefined;
-            try hash_tree_root(type_info.Optional.child, value.?, &tmp, allctr);
-            mix_in_selector(tmp, 1, out);
+            try hashTreeRoot(type_info.Optional.child, value.?, &tmp, allctr);
+            mixInSelector(tmp, 1, out);
         } else {
             var tmp: chunk = undefined;
-            mix_in_selector(zero_chunk, 0, out);
+            mixInSelector(zero_chunk, 0, out);
         },
         .Union => {
             if (type_info.Union.tag_type == null) {
@@ -666,8 +666,8 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8, allctr: *Allocat
             inline for (type_info.Union.fields) |f, index| {
                 if (@enumToInt(value) == index) {
                     var tmp: chunk = undefined;
-                    try hash_tree_root(f.field_type, @field(value, f.name), &tmp, allctr);
-                    mix_in_selector(tmp, index, out);
+                    try hashTreeRoot(f.field_type, @field(value, f.name), &tmp, allctr);
+                    mixInSelector(tmp, index, out);
                 }
             }
         },
@@ -676,7 +676,7 @@ pub fn hash_tree_root(comptime T: type, value: T, out: *[32]u8, allctr: *Allocat
 }
 
 // used at comptime to generate a bitvector from a byte vector
-fn bytes_to_bits(comptime N: usize, src: [N]u8) [N * 8]bool {
+fn bytesToBits(comptime N: usize, src: [N]u8) [N * 8]bool {
     var bitvector: [N * 8]bool = undefined;
     for (src) |byte, idx| {
         var i = 0;

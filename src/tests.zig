@@ -1,8 +1,8 @@
 const libssz = @import("./main.zig");
 const serialize = libssz.serialize;
 const deserialize = libssz.deserialize;
-const chunk_count = libssz.chunk_count;
-const hash_tree_root = libssz.hash_tree_root;
+const chunkCount = libssz.chunkCount;
+const hashTreeRoot = libssz.hashTreeRoot;
 const std = @import("std");
 const ArrayList = std.ArrayList;
 const expect = std.testing.expect;
@@ -370,33 +370,33 @@ test "serialize/deserialize a u256" {
 }
 
 test "chunk count of basic types" {
-    try expect(chunk_count(bool) == 1);
-    try expect(chunk_count(u8) == 1);
-    try expect(chunk_count(u16) == 1);
-    try expect(chunk_count(u32) == 1);
-    try expect(chunk_count(u64) == 1);
+    try expect(chunkCount(bool) == 1);
+    try expect(chunkCount(u8) == 1);
+    try expect(chunkCount(u16) == 1);
+    try expect(chunkCount(u32) == 1);
+    try expect(chunkCount(u64) == 1);
 }
 
 test "chunk count of Bitvector[N]" {
-    try expect(chunk_count([7]bool) == 1);
-    try expect(chunk_count([12]bool) == 1);
-    try expect(chunk_count([384]bool) == 2);
+    try expect(chunkCount([7]bool) == 1);
+    try expect(chunkCount([12]bool) == 1);
+    try expect(chunkCount([384]bool) == 2);
 }
 
 test "chunk count of Vector[B, N]" {
-    try expect(chunk_count([17]u32) == 3);
+    try expect(chunkCount([17]u32) == 3);
 }
 
 test "chunk count of a struct" {
-    try expect(chunk_count(Pastry) == 2);
+    try expect(chunkCount(Pastry) == 2);
 }
 
 test "chunk count of a Vector[C, N]" {
-    try expect(chunk_count([2]Pastry) == 2);
+    try expect(chunkCount([2]Pastry) == 2);
 }
 
 // used at comptime to generate a bitvector from a byte vector
-fn bytes_to_bits(comptime N: usize, src: [N]u8) [N * 8]bool {
+fn bytesToBits(comptime N: usize, src: [N]u8) [N * 8]bool {
     var bitvector: [N * 8]bool = undefined;
     for (src) |byte, idx| {
         var i = 0;
@@ -414,27 +414,27 @@ const d_bytes = [_]u8{0xdd} ** 16;
 const e_bytes = [_]u8{0xee} ** 16;
 const empty_bytes = [_]u8{0} ** 16;
 
-const a_bits = bytes_to_bits(16, a_bytes);
-const b_bits = bytes_to_bits(16, b_bytes);
-const c_bits = bytes_to_bits(16, c_bytes);
-const d_bits = bytes_to_bits(16, d_bytes);
-const e_bits = bytes_to_bits(16, e_bytes);
+const a_bits = bytesToBits(16, a_bytes);
+const b_bits = bytesToBits(16, b_bytes);
+const c_bits = bytesToBits(16, c_bytes);
+const d_bits = bytesToBits(16, d_bytes);
+const e_bits = bytesToBits(16, e_bytes);
 
 test "calculate the root hash of a boolean" {
     var expected = [_]u8{1} ++ [_]u8{0} ** 31;
     var hashed: [32]u8 = undefined;
-    try hash_tree_root(bool, true, &hashed, std.testing.allocator);
+    try hashTreeRoot(bool, true, &hashed, std.testing.allocator);
     try expect(std.mem.eql(u8, hashed[0..], expected[0..]));
 
     expected = [_]u8{0} ** 32;
-    try hash_tree_root(bool, false, &hashed, std.testing.allocator);
+    try hashTreeRoot(bool, false, &hashed, std.testing.allocator);
     try expect(std.mem.eql(u8, hashed[0..], expected[0..]));
 }
 
 test "calculate root hash of an array of two Bitvector[128]" {
     var deserialized: [2][128]bool = [2][128]bool{ a_bits, b_bits };
     var hashed: [32]u8 = undefined;
-    try hash_tree_root(@TypeOf(deserialized), deserialized, &hashed, std.testing.allocator);
+    try hashTreeRoot(@TypeOf(deserialized), deserialized, &hashed, std.testing.allocator);
 
     var expected: [32]u8 = undefined;
     const expected_preimage = a_bytes ++ empty_bytes ++ b_bytes ++ empty_bytes;
@@ -446,14 +446,14 @@ test "calculate root hash of an array of two Bitvector[128]" {
 test "calculate the root hash of an array of integers" {
     var expected = [_]u8{ 0xef, 0xbe, 0xad, 0xde, 0xfe, 0xca, 0xfe, 0xca } ++ [_]u8{0} ** 24;
     var hashed: [32]u8 = undefined;
-    try hash_tree_root([2]u32, [_]u32{ 0xdeadbeef, 0xcafecafe }, &hashed, std.testing.allocator);
+    try hashTreeRoot([2]u32, [_]u32{ 0xdeadbeef, 0xcafecafe }, &hashed, std.testing.allocator);
     try expect(std.mem.eql(u8, hashed[0..], expected[0..]));
 }
 
 test "calculate root hash of an array of three Bitvector[128]" {
     var deserialized: [3][128]bool = [3][128]bool{ a_bits, b_bits, c_bits };
     var hashed: [32]u8 = undefined;
-    try hash_tree_root(@TypeOf(deserialized), deserialized, &hashed, std.testing.allocator);
+    try hashTreeRoot(@TypeOf(deserialized), deserialized, &hashed, std.testing.allocator);
 
     var left: [32]u8 = undefined;
     var expected: [32]u8 = undefined;
@@ -472,7 +472,7 @@ test "calculate root hash of an array of three Bitvector[128]" {
 test "calculate the root hash of an array of five Bitvector[128]" {
     var deserialized = [5][128]bool{ a_bits, b_bits, c_bits, d_bits, e_bits };
     var hashed: [32]u8 = undefined;
-    try hash_tree_root(@TypeOf(deserialized), deserialized, &hashed, std.testing.allocator);
+    try hashTreeRoot(@TypeOf(deserialized), deserialized, &hashed, std.testing.allocator);
 
     var internal_nodes: [64]u8 = undefined;
     var left: [32]u8 = undefined;
@@ -516,7 +516,7 @@ test "calculate the root hash of a structure" {
     };
     var expected: [32]u8 = undefined;
     _ = try std.fmt.hexToBytes(expected[0..], "58316a908701d3660123f0b8cb7839abdd961f71d92993d34e4f480fbec687d9");
-    try hash_tree_root(Fork, fork, &hashed, std.testing.allocator);
+    try hashTreeRoot(Fork, fork, &hashed, std.testing.allocator);
     try expect(std.mem.eql(u8, hashed[0..], expected[0..]));
 }
 
@@ -529,12 +529,12 @@ test "calculate the root hash of an Optional" {
 
     _ = try std.fmt.hexToBytes(payload[0..], "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
     sha256.hash(payload[0..], expected[0..], sha256.Options{});
-    try hash_tree_root(?u32, v, &hashed, std.testing.allocator);
+    try hashTreeRoot(?u32, v, &hashed, std.testing.allocator);
     try expect(std.mem.eql(u8, hashed[0..], expected[0..]));
 
     _ = try std.fmt.hexToBytes(payload[0..], "efbeadde000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000");
     sha256.hash(payload[0..], expected[0..], sha256.Options{});
-    try hash_tree_root(?u32, u, &hashed, std.testing.allocator);
+    try hashTreeRoot(?u32, u, &hashed, std.testing.allocator);
     try expect(std.mem.eql(u8, hashed[0..], expected[0..]));
 }
 
@@ -548,12 +548,12 @@ test "calculate the root hash of an union" {
     _ = try std.fmt.hexToBytes(payload[0..], "d2040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
     var exp1: [32]u8 = undefined;
     sha256.hash(payload[0..], exp1[0..], sha256.Options{});
-    try hash_tree_root(Payload, Payload{ .int = 1234 }, &out, std.testing.allocator);
+    try hashTreeRoot(Payload, Payload{ .int = 1234 }, &out, std.testing.allocator);
     try expect(std.mem.eql(u8, out[0..], exp1[0..]));
 
     var exp2: [32]u8 = undefined;
     _ = try std.fmt.hexToBytes(payload[0..], "01000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000");
     sha256.hash(payload[0..], exp2[0..], sha256.Options{});
-    try hash_tree_root(Payload, Payload{ .boolean = true }, &out, std.testing.allocator);
+    try hashTreeRoot(Payload, Payload{ .boolean = true }, &out, std.testing.allocator);
     try expect(std.mem.eql(u8, out[0..], exp2[0..]));
 }
