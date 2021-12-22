@@ -489,8 +489,7 @@ pub fn merkleize(chunks: []chunk, limit: ?usize, out: *[32]u8) void {
             if (size / 2 < chunks.len) {
                 merkleize(chunks[size / 2 ..], size / 2, &buf);
                 digest.update(buf[0..]);
-            } else
-                digest.update(hash_of_zeros[limit.?][0..]);
+            } else digest.update(hash_of_zeros[limit.?][0..]);
             digest.final(out);
         },
     }
@@ -507,11 +506,11 @@ test "merkleize a string" {
 
     // Build the expected tree
     const leaf1 = [_]u8{0x61} ** 32; // "0xaaaaa....aa" 32 times
-    var leaf2 : [32]u8 = undefined;
+    var leaf2: [32]u8 = undefined;
     _ = try std.fmt.hexToBytes(leaf2[0..], "6161616100000000000000000000000000000000000000000000000000000000");
-    var root : [32]u8 = undefined;
-    var internal_left : [32]u8 = undefined;
-    var internal_right : [32]u8 = undefined;
+    var root: [32]u8 = undefined;
+    var internal_left: [32]u8 = undefined;
+    var internal_right: [32]u8 = undefined;
     var hasher = sha256.init(sha256.Options{});
     hasher.update(leaf1[0..]);
     hasher.update(leaf1[0..]);
