@@ -344,9 +344,9 @@ test "mix_in_length" {
     var length: [32]u8 = undefined;
     var expected: [32]u8 = undefined;
     var mixin: [32]u8 = undefined;
-    try std.fmt.hexToBytes(root[0..], "2279cf111c15f2d594e7a0055e8735e7409e56ed4250735d6d2f2b0d1bcf8297");
-    try std.fmt.hexToBytes(length[0..], "deadbeef00000000000000000000000000000000000000000000000000000000");
-    try std.fmt.hexToBytes(expected[0..], "91bac5750e259d1ea683ff193334cbd1afb584e420964f678f9839076bb5f1e6");
+    _ = try std.fmt.hexToBytes(root[0..], "2279cf111c15f2d594e7a0055e8735e7409e56ed4250735d6d2f2b0d1bcf8297");
+    _ = try std.fmt.hexToBytes(length[0..], "deadbeef00000000000000000000000000000000000000000000000000000000");
+    _ = try std.fmt.hexToBytes(expected[0..], "91bac5750e259d1ea683ff193334cbd1afb584e420964f678f9839076bb5f1e6");
     mix_in_length(root, length, &mixin);
 
     std.testing.expect(std.mem.eql(u8, mixin[0..], expected[0..]));
@@ -389,7 +389,7 @@ test "pack u32" {
     defer list.deinit();
     const out = try pack(u32, 0xdeadbeef, &list);
 
-    try std.fmt.hexToBytes(expected[0..], "efbeadde00000000000000000000000000000000000000000000000000000000");
+    _ = try std.fmt.hexToBytes(expected[0..], "efbeadde00000000000000000000000000000000000000000000000000000000");
 
     std.testing.expect(std.mem.eql(u8, out[0][0..], expected[0..]));
 }
@@ -400,7 +400,7 @@ test "pack bool" {
     defer list.deinit();
     const out = try pack(bool, true, &list);
 
-    try std.fmt.hexToBytes(expected[0..], "0100000000000000000000000000000000000000000000000000000000000000");
+    _ = try std.fmt.hexToBytes(expected[0..], "0100000000000000000000000000000000000000000000000000000000000000");
 
     std.testing.expect(std.mem.eql(u8, out[0][0..], expected[0..]));
 }
@@ -411,7 +411,7 @@ test "pack string" {
     defer list.deinit();
     const out = try pack([]const u8, "a" ** 100, &list);
 
-    try std.fmt.hexToBytes(expected[0..], "6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616100000000000000000000000000000000000000000000000000000000");
+    _ = try std.fmt.hexToBytes(expected[0..], "6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616100000000000000000000000000000000000000000000000000000000");
 
     std.testing.expect(expected.len == out.len * out[0].len);
     std.testing.expect(std.mem.eql(u8, out[0][0..], expected[0..32]));
@@ -505,10 +505,11 @@ test "merkleize a string" {
     var chunks = try pack([]const u8, "a" ** 100, &list);
     var out: [32]u8 = undefined;
     merkleize(chunks, null, &out);
+
     // Build the expected tree
     const leaf1 = [_]u8{0x61} ** 32; // "0xaaaaa....aa" 32 times
     var leaf2 : [32]u8 = undefined;
-    try std.fmt.hexToBytes(leaf2[0..], "6161616100000000000000000000000000000000000000000000000000000000");
+    _ = try std.fmt.hexToBytes(leaf2[0..], "6161616100000000000000000000000000000000000000000000000000000000");
     var root : [32]u8 = undefined;
     var internal_left : [32]u8 = undefined;
     var internal_right : [32]u8 = undefined;
@@ -525,6 +526,6 @@ test "merkleize a string" {
     hasher.update(internal_right[0..]);
     hasher.final(&root);
 
-    std.testing.expect(std.mem.eql(u8, out[0..], root[0..]));
+    try std.testing.expect(std.mem.eql(u8, out[0..], root[0..]));
 }
 }
