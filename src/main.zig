@@ -349,7 +349,7 @@ test "mix_in_length" {
     _ = try std.fmt.hexToBytes(expected[0..], "91bac5750e259d1ea683ff193334cbd1afb584e420964f678f9839076bb5f1e6");
     mix_in_length(root, length, &mixin);
 
-    std.testing.expect(std.mem.eql(u8, mixin[0..], expected[0..]));
+    try std.testing.expect(std.mem.eql(u8, mixin[0..], expected[0..]));
 }
 
 /// Calculates the number of leaves needed for the merkelization
@@ -391,7 +391,7 @@ test "pack u32" {
 
     _ = try std.fmt.hexToBytes(expected[0..], "efbeadde00000000000000000000000000000000000000000000000000000000");
 
-    std.testing.expect(std.mem.eql(u8, out[0][0..], expected[0..]));
+    try std.testing.expect(std.mem.eql(u8, out[0][0..], expected[0..]));
 }
 
 test "pack bool" {
@@ -402,7 +402,7 @@ test "pack bool" {
 
     _ = try std.fmt.hexToBytes(expected[0..], "0100000000000000000000000000000000000000000000000000000000000000");
 
-    std.testing.expect(std.mem.eql(u8, out[0][0..], expected[0..]));
+    try std.testing.expect(std.mem.eql(u8, out[0][0..], expected[0..]));
 }
 
 test "pack string" {
@@ -413,11 +413,11 @@ test "pack string" {
 
     _ = try std.fmt.hexToBytes(expected[0..], "6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616100000000000000000000000000000000000000000000000000000000");
 
-    std.testing.expect(expected.len == out.len * out[0].len);
-    std.testing.expect(std.mem.eql(u8, out[0][0..], expected[0..32]));
-    std.testing.expect(std.mem.eql(u8, out[1][0..], expected[32..64]));
-    std.testing.expect(std.mem.eql(u8, out[2][0..], expected[64..96]));
-    std.testing.expect(std.mem.eql(u8, out[3][0..], expected[96..]));
+    try std.testing.expect(expected.len == out.len * out[0].len);
+    try std.testing.expect(std.mem.eql(u8, out[0][0..], expected[0..32]));
+    try std.testing.expect(std.mem.eql(u8, out[1][0..], expected[32..64]));
+    try std.testing.expect(std.mem.eql(u8, out[2][0..], expected[64..96]));
+    try std.testing.expect(std.mem.eql(u8, out[3][0..], expected[96..]));
 }
 
 fn next_pow_of_two(len: usize) !usize {
@@ -438,17 +438,16 @@ fn next_pow_of_two(len: usize) !usize {
 
 test "next power of 2" {
     var out = try next_pow_of_two(0b1);
-    std.debug.print("{}\n", .{out});
-    std.testing.expect(out == 1);
+    try std.testing.expect(out == 1);
     out = try next_pow_of_two(0b10);
-    std.testing.expect(out == 2);
+    try std.testing.expect(out == 2);
     out = try next_pow_of_two(0b11);
-    std.testing.expect(out == 4);
+    try std.testing.expect(out == 4);
 
     // special cases
     out = try next_pow_of_two(0);
-    std.testing.expect(out == 0);
-    std.testing.expectError(error.OverflowsUSize, next_pow_of_two(std.math.maxInt(usize)));
+    try std.testing.expect(out == 0);
+    try std.testing.expectError(error.OverflowsUSize, next_pow_of_two(std.math.maxInt(usize)));
 }
 
 // List of root hashes of zero-subtries, up to depth 255.
