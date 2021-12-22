@@ -274,7 +274,7 @@ test "deserializes a string" {
 
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
-    const serialized = try serialize([]const u8, exp, &list);
+    try serialize([]const u8, exp, &list);
 
     var got: []const u8 = undefined;
 

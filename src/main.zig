@@ -100,7 +100,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
 
                     // Now serialize one item after the other
                     // and update the offset list with its location.
-                    for (data) |item, index| {
+                    for (data) |item| {
                         std.mem.writeIntLittle(u32, l.items[start .. start + 4][0..4], @truncate(u32, l.items.len));
                         _ = try serialize(info.Array.child, item, l);
                         start += 4;
@@ -213,10 +213,10 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                     }
                 }
             } else {
-                comptime const U = info.Array.child;
+                const U = info.Array.child;
                 if (try isFixedSizeObject(U)) {
                     comptime var i = 0;
-                    comptime const pitch = @sizeOf(U);
+                    const pitch = @sizeOf(U);
                     inline while (i < out.len) : (i += pitch) {
                         try deserialize(U, serialized[i * pitch .. (i + 1) * pitch], &out[i]);
                     }
@@ -656,7 +656,6 @@ pub fn hashTreeRoot(comptime T: type, value: T, out: *[32]u8, allctr: *Allocator
             try hashTreeRoot(type_info.Optional.child, value.?, &tmp, allctr);
             mixInSelector(tmp, 1, out);
         } else {
-            var tmp: chunk = undefined;
             mixInSelector(zero_chunk, 0, out);
         },
         .Union => {
