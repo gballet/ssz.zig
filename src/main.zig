@@ -240,20 +240,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
         .Bool => out.* = (serialized[0] == 1),
         .Int => {
             const N = @sizeOf(T);
-            comptime var i: usize = 0;
-            out.* = @as(T, 0);
-            inline while (i < N) : (i += 1) {
-                // if the integer takes more than one byte, then
-                // shift the result by one byte and OR the next
-                // byte in the sequence.
-                if (@sizeOf(T) > 1) {
-                    out.* <<= 8;
-                }
-                out.* |= switch (builtin.cpu.arch.endian()) {
-                    .Big => @as(T, serialized[i]),
-                    else => @as(T, serialized[N - i - 1]),
-                };
-            }
+            out.* = std.mem.readIntLittle(T, serialized[0..N]);
         },
         .Optional => if (serialized.len != 0) {
             var x: info.Optional.child = undefined;
