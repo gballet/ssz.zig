@@ -583,7 +583,7 @@ fn packBits(bits: []const bool, l: *ArrayList(u8)) ![]chunk {
     return std.mem.bytesAsSlice(chunk, l.items);
 }
 
-pub fn hashTreeRoot(comptime T: type, value: T, out: *[32]u8, allctr: *Allocator) !void {
+pub fn hashTreeRoot(comptime T: type, value: T, out: *[32]u8, allctr: Allocator) !void {
     const type_info = @typeInfo(T);
     switch (type_info) {
         .Int, .Bool => {
