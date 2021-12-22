@@ -318,7 +318,7 @@ test "deserializes a Vector[N]" {
     comptime var i = 0;
     inline while (i < pastries.len) : (i += 1) {
         try expect(out[i].weight == pastries[i].weight);
-        expect(std.mem.eql(u8, pastries[i].name, out[i].name));
+        try expect(std.mem.eql(u8, pastries[i].name, out[i].name));
     }
 }
 
