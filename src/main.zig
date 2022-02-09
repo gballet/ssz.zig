@@ -93,9 +93,8 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                     var start = l.items.len;
 
                     // Reserve the space for the offset
-                    const offset = [_]u8{ 0, 0, 0, 0 };
                     for (data) |_| {
-                        _ = try l.writer().write(offset[0..4]);
+                        _ = try l.writer().writeIntLittle(u32, 0);
                     }
 
                     // Now serialize one item after the other
@@ -115,11 +114,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                 try l.append(0);
             }
         },
-        .Int => {
-            var serialized: [@sizeOf(T)]u8 = undefined;
-            std.mem.writeIntLittle(T, serialized[0..], data);
-            _ = try l.writer().write(serialized[0..]);
-        },
+        .Int => _ = try l.writer().writeIntLittle(T, data),
         .Pointer => {
             // Bitlist[N] or list?
             switch (info.Pointer.size) {
