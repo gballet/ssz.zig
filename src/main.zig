@@ -432,7 +432,7 @@ fn nextPowOfTwo(len: usize) !usize {
     // check that the msb isn't set and
     // return an error if it is, as it
     // would overflow.
-    if (@clz(usize, len) == 0) {
+    if (@clz(len) == 0) {
         return error.OverflowsUSize;
     }
 

@@ -211,7 +211,6 @@ test "serializes a union" {
         @panic("didn't catch error");
     } else |err| switch (err) {
         error.UnionIsNotTagged => {},
-        else => @panic("invalid error"),
     }
 }
 
@@ -334,9 +333,6 @@ test "deserializes an invalid Vector[N] payload" {
         @panic("missed error");
     } else |err| switch (err) {
         error.IndexOutOfBounds => {},
-        else => {
-            @panic("unexpected error");
-        },
     }
 }
 
