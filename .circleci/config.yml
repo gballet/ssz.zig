@@ -18,16 +18,16 @@ jobs:
       - checkout
       - run:
           name: download zig version
-          command: curl https://ziglang.org/download/0.9.0/zig-linux-x86_64-0.9.0.tar.xz > zig.tar.xz && tar xf zig.tar.xz
+          command: curl https://ziglang.org/download/0.10.0/zig-linux-x86_64-0.10.0.tar.xz > zig.tar.xz && tar xf zig.tar.xz
       - run:
           name: print zig version
           command: |
-            PATH="$PATH:./zig-linux-x86_64-0.9.0"
+            PATH="$PATH:./zig-linux-x86_64-0.10.0"
             zig version
       - run:
           name: run tests
           command: |
-            PATH="$PATH:./zig-linux-x86_64-0.9.0"
+            PATH="$PATH:./zig-linux-x86_64-0.10.0"
             zig build test
 workflows:
   version: 2
