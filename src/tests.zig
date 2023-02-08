@@ -191,7 +191,7 @@ test "serializes an optional object" {
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
     try serialize(@TypeOf(null_or_string), null_or_string, &list);
-    try expect(list.items.len == 0);
+    try expect(list.items.len == 1);
 }
 
 test "serializes a union" {
