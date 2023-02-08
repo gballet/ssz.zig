@@ -184,7 +184,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
             }
             inline for (info.Union.fields) |f, index| {
                 if (@enumToInt(data) == index) {
-                    try serialize(u32, index, l);
+                    _ = try l.writer().writeIntLittle(u8, index);
                     try serialize(f.field_type, @field(data, f.name), l);
                     return;
                 }
@@ -302,8 +302,8 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
         },
         .Union => {
             // Read the type index
-            var union_index: u32 = undefined;
-            try deserialize(u32, serialized, &union_index);
+            var union_index: u8 = undefined;
+            try deserialize(u8, serialized, &union_index);
 
             // Use the index to figure out which type must
             // be deserialized.
@@ -313,7 +313,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                     // because this field type hasn't been activated at this
                     // stage.
                     var data: field.field_type = undefined;
-                    try deserialize(field.field_type, serialized[4..], &data);
+                    try deserialize(field.field_type, serialized[1..], &data);
                     out.* = @unionInit(T, field.name, data);
                 }
             }

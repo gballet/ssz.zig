@@ -194,13 +194,13 @@ test "serializes a union" {
 
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
-    const exp = [_]u8{ 0, 0, 0, 0, 210, 4, 0, 0, 0, 0, 0, 0 };
+    const exp = [_]u8{ 0, 210, 4, 0, 0, 0, 0, 0, 0 };
     try serialize(Payload, Payload{ .int = 1234 }, &list);
     try expect(std.mem.eql(u8, list.items, exp[0..]));
 
     var list2 = ArrayList(u8).init(std.testing.allocator);
     defer list2.deinit();
-    const exp2 = [_]u8{ 1, 0, 0, 0, 1 };
+    const exp2 = [_]u8{ 1, 1 };
     try serialize(Payload, Payload{ .boolean = true }, &list2);
     try expect(std.mem.eql(u8, list2.items, exp2[0..]));
 
@@ -349,13 +349,15 @@ test "deserializes an union" {
     };
 
     var p: Payload = undefined;
-    try deserialize(Payload, ([_]u8{ 1, 0, 0, 0, 1 })[0..], &p);
+    try deserialize(Payload, ([_]u8{ 1, 1 })[0..], &p);
     try expect(p.boolean == true);
+    std.debug.print("{}\n", .{p.boolean});
 
-    try deserialize(Payload, ([_]u8{ 1, 0, 0, 0, 0 })[0..], &p);
+    try deserialize(Payload, ([_]u8{ 1, 0 })[0..], &p);
     try expect(p.boolean == false);
+    std.debug.print("{}\n", .{p.boolean});
 
-    try deserialize(Payload, ([_]u8{ 0, 0, 0, 0, 1, 2, 3, 4 })[0..], &p);
+    try deserialize(Payload, ([_]u8{ 0, 1, 2, 3, 4 })[0..], &p);
     try expect(p.int == 0x04030201);
 }
 
