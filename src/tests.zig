@@ -182,6 +182,8 @@ test "serializes a structure with optional fields" {
     // only available in >=0.11
     // try std.testing.expectEqualDeep(data, deserialized);
     try expect(std.mem.eql(u8, data.name.?, deserialized.name.?));
+    try std.testing.expectEqual(data.age, deserialized.age);
+    try std.testing.expectEqual(deserialized.company, null);
 }
 
 test "serializes an optional object" {
