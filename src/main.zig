@@ -26,9 +26,9 @@ fn serializedSize(comptime T: type, data: T) !usize {
             else => serializedSize(info.Pointer.child, data.*),
         },
         .Optional => if (data == null)
-            @as(usize, 0)
+            @as(usize, 1)
         else
-            serializedSize(info.Optional.child, data.?),
+            1 + try serializedSize(info.Optional.child, data.?),
         .Null => @as(usize, 0),
         else => error.NoSerializedSizeAvailable,
     };
@@ -175,9 +175,17 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                 }
             }
         },
-        // Nothing to be added
+        // Nothing to be added to the payload
         .Null => {},
-        .Optional => if (data != null) try serialize(info.Optional.child, data.?, l),
+        // Optionals are like unions, but their 0 value has to be 0.
+        .Optional => {
+            if (data != null) {
+                _ = try l.writer().writeIntLittle(u8, 1);
+                try serialize(info.Optional.child, data.?, l);
+            } else {
+                _ = try l.writer().writeIntLittle(u8, 0);
+            }
+        },
         .Union => {
             if (info.Union.tag_type == null) {
                 return error.UnionIsNotTagged;
@@ -243,12 +251,15 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
             const N = @sizeOf(T);
             out.* = std.mem.readIntLittle(T, serialized[0..N]);
         },
-        .Optional => if (serialized.len != 0) {
-            var x: info.Optional.child = undefined;
-            try deserialize(info.Optional.child, serialized, &x);
-            out.* = x;
-        } else {
-            out.* = null;
+        .Optional => {
+            const index: u8 = serialized[0];
+            if (index != 0) {
+                var x: info.Optional.child = undefined;
+                try deserialize(info.Optional.child, serialized[1..], &x);
+                out.* = x;
+            } else {
+                out.* = null;
+            }
         },
         // Data is not copied in this function, copy is therefore
         // the responsibility of the caller.
