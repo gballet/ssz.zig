@@ -283,7 +283,8 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
             // and write down the start offset of each variable-sized
             // field.
             comptime var i = 0;
-            inline for (info.Struct.fields) |field, field_index| {
+            comptime var variable_field_index = 0;
+            inline for (info.Struct.fields) |field| {
                 switch (@typeInfo(field.field_type)) {
                     .Bool, .Int => {
                         // Direct deserialize
@@ -291,8 +292,9 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                         i += @sizeOf(field.field_type);
                     },
                     else => {
-                        try deserialize(u32, serialized[i .. i + 4], &indices[field_index]);
+                        try deserialize(u32, serialized[i .. i + 4], &indices[variable_field_index]);
                         i += 4;
+                        variable_field_index += 1;
                     },
                 }
             }

@@ -170,12 +170,18 @@ test "serializes a structure with optional fields" {
         .company = null,
     };
 
-    const serialized_data = [_]u8{ 9, 0, 0, 0, 32, 14, 0, 0, 0, 74, 97, 109, 101, 115 };
+    const serialized_data = [_]u8{ 9, 0, 0, 0, 32, 15, 0, 0, 0, 1, 74, 97, 109, 101, 115, 0 };
 
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
     try serialize(@TypeOf(data), data, &list);
     try expect(std.mem.eql(u8, list.items, serialized_data[0..]));
+
+    var deserialized: Employee = undefined;
+    try deserialize(Employee, list.items, &deserialized);
+    // only available in >=0.11
+    // try std.testing.expectEqualDeep(data, deserialized);
+    try expect(std.mem.eql(u8, data.name.?, deserialized.name.?));
 }
 
 test "serializes an optional object" {
