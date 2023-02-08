@@ -114,7 +114,13 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                 try l.append(0);
             }
         },
-        .Int => _ = try l.writer().writeIntLittle(T, data),
+        .Int => |int| {
+            switch (int.bits) {
+                8, 16, 32, 64, 128, 256 => {},
+                else => return error.InvalidSerializedLengthType,
+            }
+            _ = try l.writer().writeIntLittle(T, data);
+        },
         .Pointer => {
             // Bitlist[N] or list?
             switch (info.Pointer.size) {
