@@ -48,6 +48,12 @@ test "serializes a int32" {
     try expect(std.mem.eql(u8, list.items, serialized_data[0..]));
 }
 
+test "non-byte aligned int serialization fails" {
+    var data: u10 = 0x03ff;
+    var list = ArrayList(u8).init(std.testing.allocator);
+    try std.testing.expectError(error.InvalidSerializedIntLengthType, serialize(u10, data, &list));
+}
+
 test "serializes bool" {
     var data = false;
     var serialized_data = [_]u8{0x00};
