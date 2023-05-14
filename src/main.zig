@@ -18,7 +18,7 @@ const BYTES_PER_LENGTH_OFFSET = 4;
 // the code serializing of variable-size objects can
 // determine the offset to the next object.
 fn serializedSize(comptime T: type, data: T) !usize {
-    const info = @typeInfo(T);
+    const info: builtin.Type = @typeInfo(T);
     return switch (info) {
         .Array => data.len,
         .Pointer => switch (info.Pointer.size) {
@@ -41,7 +41,7 @@ fn isFixedSizeObject(comptime T: type) !bool {
         .Bool, .Int, .Null => return true,
         .Array => return false,
         .Struct => inline for (info.Struct.fields) |field| {
-            if (!try isFixedSizeObject(field.field_type)) {
+            if (!try isFixedSizeObject(field.type)) {
                 return false;
             }
         },
@@ -63,7 +63,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
             // Bitvector[N] or vector?
             if (info.Array.child == bool) {
                 var byte: u8 = 0;
-                for (data) |bit, index| {
+                for (data, 0..) |bit, index| {
                     if (bit) {
                         byte |= @as(u8, 1) << @truncate(u3, index);
                     }
@@ -140,8 +140,8 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
             // First pass, accumulate the fixed sizes
             comptime var var_start = 0;
             inline for (info.Struct.fields) |field| {
-                if (@typeInfo(field.field_type) == .Int or @typeInfo(field.field_type) == .Bool) {
-                    var_start += @sizeOf(field.field_type);
+                if (@typeInfo(field.type) == .Int or @typeInfo(field.type) == .Bool) {
+                    var_start += @sizeOf(field.type);
                 } else {
                     var_start += 4;
                 }
@@ -150,13 +150,13 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
             // Second pass: intertwine fixed fields and variables offsets
             var var_acc = @as(usize, var_start); // variable part size accumulator
             inline for (info.Struct.fields) |field| {
-                switch (@typeInfo(field.field_type)) {
+                switch (@typeInfo(field.type)) {
                     .Int, .Bool => {
-                        try serialize(field.field_type, @field(data, field.name), l);
+                        try serialize(field.type, @field(data, field.name), l);
                     },
                     else => {
                         try serialize(u32, @truncate(u32, var_acc), l);
-                        var_acc += try serializedSize(field.field_type, @field(data, field.name));
+                        var_acc += try serializedSize(field.type, @field(data, field.name));
                     },
                 }
             }
@@ -164,12 +164,12 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
             // Third pass: add variable fields at the end
             if (var_acc > var_start) {
                 inline for (info.Struct.fields) |field| {
-                    switch (@typeInfo(field.field_type)) {
+                    switch (@typeInfo(field.type)) {
                         .Int, .Bool => {
                             // skip fixed-size fields
                         },
                         else => {
-                            try serialize(field.field_type, @field(data, field.name), l);
+                            try serialize(field.type, @field(data, field.name), l);
                         },
                     }
                 }
@@ -190,10 +190,10 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
             if (info.Union.tag_type == null) {
                 return error.UnionIsNotTagged;
             }
-            inline for (info.Union.fields) |f, index| {
+            inline for (info.Union.fields, 0..) |f, index| {
                 if (@enumToInt(data) == index) {
                     _ = try l.writer().writeIntLittle(u8, index);
-                    try serialize(f.field_type, @field(data, f.name), l);
+                    try serialize(f.type, @field(data, f.name), l);
                     return;
                 }
             }
@@ -213,7 +213,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
         .Array => {
             // Bitvector[N] or regular vector?
             if (info.Array.child == bool) {
-                for (serialized) |byte, bindex| {
+                for (serialized, 0..) |byte, bindex| {
                     var i = @as(u8, 0);
                     var b = byte;
                     while (bindex * 8 + i < out.len and i < 8) : (i += 1) {
@@ -270,7 +270,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
             comptime var n_var_fields = 0;
             comptime {
                 for (info.Struct.fields) |field| {
-                    switch (@typeInfo(field.field_type)) {
+                    switch (@typeInfo(field.type)) {
                         .Int, .Bool => {},
                         else => n_var_fields += 1,
                     }
@@ -285,11 +285,11 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
             comptime var i = 0;
             comptime var variable_field_index = 0;
             inline for (info.Struct.fields) |field| {
-                switch (@typeInfo(field.field_type)) {
+                switch (@typeInfo(field.type)) {
                     .Bool, .Int => {
                         // Direct deserialize
-                        try deserialize(field.field_type, serialized[i .. i + @sizeOf(field.field_type)], &@field(out.*, field.name));
-                        i += @sizeOf(field.field_type);
+                        try deserialize(field.type, serialized[i .. i + @sizeOf(field.type)], &@field(out.*, field.name));
+                        i += @sizeOf(field.type);
                     },
                     else => {
                         try deserialize(u32, serialized[i .. i + 4], &indices[variable_field_index]);
@@ -303,11 +303,11 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
             // now that their offset is known.
             comptime var last_index = 0;
             inline for (info.Struct.fields) |field| {
-                switch (@typeInfo(field.field_type)) {
+                switch (@typeInfo(field.type)) {
                     .Bool, .Int => {}, // covered by the previous pass
                     else => {
                         const end = if (last_index == indices.len - 1) serialized.len else indices[last_index + 1];
-                        try deserialize(field.field_type, serialized[indices[last_index]..end], &@field(out.*, field.name));
+                        try deserialize(field.type, serialized[indices[last_index]..end], &@field(out.*, field.name));
                         last_index += 1;
                     },
                 }
@@ -320,13 +320,13 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
 
             // Use the index to figure out which type must
             // be deserialized.
-            inline for (info.Union.fields) |field, index| {
+            inline for (info.Union.fields, 0..) |field, index| {
                 if (index == union_index) {
                     // &@field(out.*, field.name) can not be used directly,
                     // because this field type hasn't been activated at this
                     // stage.
-                    var data: field.field_type = undefined;
-                    try deserialize(field.field_type, serialized[1..], &data);
+                    var data: field.type = undefined;
+                    try deserialize(field.type, serialized[1..], &data);
                     out.* = @unionInit(T, field.name, data);
                 }
             }
@@ -567,7 +567,7 @@ test "merkleize a bytes16 vector with one element" {
 
 fn packBits(bits: []const bool, l: *ArrayList(u8)) ![]chunk {
     var byte: u8 = 0;
-    for (bits) |bit, bitidx| {
+    for (bits, 0..) |bit, bitidx| {
         if (bit) {
             byte |= @as(u8, 1) << @truncate(u3, 7 - bitidx % 8);
         }
@@ -646,7 +646,7 @@ pub fn hashTreeRoot(comptime T: type, value: T, out: *[32]u8, allctr: Allocator)
             defer chunks.deinit();
             var tmp: chunk = undefined;
             inline for (type_info.Struct.fields) |f| {
-                try hashTreeRoot(f.field_type, @field(value, f.name), &tmp, allctr);
+                try hashTreeRoot(f.type, @field(value, f.name), &tmp, allctr);
                 try chunks.append(tmp);
             }
             try merkleize(chunks.items, null, out);
@@ -663,10 +663,10 @@ pub fn hashTreeRoot(comptime T: type, value: T, out: *[32]u8, allctr: Allocator)
             if (type_info.Union.tag_type == null) {
                 return error.UnionIsNotTagged;
             }
-            inline for (type_info.Union.fields) |f, index| {
+            inline for (type_info.Union.fields, 0..) |f, index| {
                 if (@enumToInt(value) == index) {
                     var tmp: chunk = undefined;
-                    try hashTreeRoot(f.field_type, @field(value, f.name), &tmp, allctr);
+                    try hashTreeRoot(f.type, @field(value, f.name), &tmp, allctr);
                     mixInSelector(tmp, index, out);
                 }
             }
@@ -678,7 +678,7 @@ pub fn hashTreeRoot(comptime T: type, value: T, out: *[32]u8, allctr: Allocator)
 // used at comptime to generate a bitvector from a byte vector
 fn bytesToBits(comptime N: usize, src: [N]u8) [N * 8]bool {
     var bitvector: [N * 8]bool = undefined;
-    for (src) |byte, idx| {
+    for (src, 0..) |byte, idx| {
         var i = 0;
         while (i < 8) : (i += 1) {
             bitvector[i + idx * 8] = ((byte >> (7 - i)) & 1) == 1;
