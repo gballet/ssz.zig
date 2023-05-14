@@ -410,7 +410,7 @@ test "chunk count of a Vector[C, N]" {
 // used at comptime to generate a bitvector from a byte vector
 fn bytesToBits(comptime N: usize, src: [N]u8) [N * 8]bool {
     var bitvector: [N * 8]bool = undefined;
-    for (src) |byte, idx| {
+    for (src, 0..) |byte, idx| {
         var i = 0;
         while (i < 8) : (i += 1) {
             bitvector[i + idx * 8] = ((byte >> (7 - i)) & 1) == 1;
