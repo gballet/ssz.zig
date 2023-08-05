@@ -1,4 +1,4 @@
-const Builder = @import("std").build.Builder;
+const Builder = @import("std").Build;
 
 pub fn build(b: *Builder) void {
     const target = b.standardTargetOptions(.{});
@@ -11,7 +11,7 @@ pub fn build(b: *Builder) void {
     });
     b.installArtifact(lib);
 
-    var main_tests = b.addTest(.{
+    const main_tests = b.addTest(.{
         .root_source_file = .{ .path = "src/main.zig" },
         .optimize = optimize,
         .target = target,
@@ -21,8 +21,9 @@ pub fn build(b: *Builder) void {
         .optimize = optimize,
         .target = target,
     });
+    const run_main_tests = b.addRunArtifact(main_tests);
 
     const test_step = b.step("test", "Run library tests");
-    test_step.dependOn(&main_tests.step);
     test_step.dependOn(&tests_tests.step);
+    test_step.dependOn(&run_main_tests.step);
 }
