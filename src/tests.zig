@@ -359,11 +359,9 @@ test "deserializes an union" {
     var p: Payload = undefined;
     try deserialize(Payload, ([_]u8{ 1, 1 })[0..], &p);
     try expect(p.boolean == true);
-    std.debug.print("{}\n", .{p.boolean});
 
     try deserialize(Payload, ([_]u8{ 1, 0 })[0..], &p);
     try expect(p.boolean == false);
-    std.debug.print("{}\n", .{p.boolean});
 
     try deserialize(Payload, ([_]u8{ 0, 1, 2, 3, 4 })[0..], &p);
     try expect(p.int == 0x04030201);
