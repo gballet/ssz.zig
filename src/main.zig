@@ -489,7 +489,7 @@ pub fn merkleize(chunks: []chunk, limit: ?usize, out: *[32]u8) anyerror!void {
             // Merkleize the left side. If the number of chunks
             // isn't enough to fill the entire width, complete
             // with zeroes.
-            const digest = sha256.init(sha256.Options{});
+            var digest = sha256.init(sha256.Options{});
             var buf: [32]u8 = undefined;
             const split = if (size / 2 < chunks.len) size / 2 else chunks.len;
             try merkleize(chunks[0..split], size / 2, &buf);
