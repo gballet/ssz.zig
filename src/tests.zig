@@ -9,7 +9,7 @@ const expect = std.testing.expect;
 const sha256 = std.crypto.hash.sha2.Sha256;
 
 test "serializes uint8" {
-    var data: u8 = 0x55;
+    const data: u8 = 0x55;
     const serialized_data = [_]u8{0x55};
 
     var list = ArrayList(u8).init(std.testing.allocator);
@@ -19,7 +19,7 @@ test "serializes uint8" {
 }
 
 test "serializes uint16" {
-    var data: u16 = 0x5566;
+    const data: u16 = 0x5566;
     const serialized_data = [_]u8{ 0x66, 0x55 };
 
     var list = ArrayList(u8).init(std.testing.allocator);
@@ -29,7 +29,7 @@ test "serializes uint16" {
 }
 
 test "serializes uint32" {
-    var data: u32 = 0x55667788;
+    const data: u32 = 0x55667788;
     const serialized_data = [_]u8{ 0x88, 0x77, 0x66, 0x55 };
 
     var list = ArrayList(u8).init(std.testing.allocator);
@@ -39,7 +39,7 @@ test "serializes uint32" {
 }
 
 test "serializes a int32" {
-    var data: i32 = -(0x11223344);
+    const data: i32 = -(0x11223344);
     const serialized_data = [_]u8{ 0xbc, 0xcc, 0xdd, 0xee };
 
     var list = ArrayList(u8).init(std.testing.allocator);
@@ -49,7 +49,7 @@ test "serializes a int32" {
 }
 
 test "non-byte aligned int serialization fails" {
-    var data: u10 = 0x03ff;
+    const data: u10 = 0x03ff;
     var list = ArrayList(u8).init(std.testing.allocator);
     try std.testing.expectError(error.InvalidSerializedIntLengthType, serialize(u10, data, &list));
 }
@@ -73,7 +73,7 @@ test "serializes bool" {
 }
 
 test "serializes Bitvector[N] == [N]bool" {
-    var data7 = [_]bool{ true, false, true, true, false, false, false };
+    const data7 = [_]bool{ true, false, true, true, false, false, false };
     var serialized_data = [_]u8{0b00001101};
     var exp = serialized_data[0..serialized_data.len];
 
@@ -82,7 +82,7 @@ test "serializes Bitvector[N] == [N]bool" {
     try serialize([7]bool, data7, &list7);
     try expect(std.mem.eql(u8, list7.items, exp));
 
-    var data8 = [_]bool{ true, false, true, true, false, false, false, true };
+    const data8 = [_]bool{ true, false, true, true, false, false, false, true };
     serialized_data = [_]u8{0b10001101};
     exp = serialized_data[0..serialized_data.len];
 
@@ -91,7 +91,7 @@ test "serializes Bitvector[N] == [N]bool" {
     try serialize([8]bool, data8, &list8);
     try expect(std.mem.eql(u8, list8.items, exp));
 
-    var data12 = [_]bool{ true, false, true, true, false, false, false, true, false, true, false, true };
+    const data12 = [_]bool{ true, false, true, true, false, false, false, true, false, true, false, true };
 
     var list12 = ArrayList(u8).init(std.testing.allocator);
     defer list12.deinit();
@@ -130,7 +130,7 @@ test "serializes an array of structures" {
 }
 
 test "serializes a structure without variable fields" {
-    var data = .{
+    const data = .{
         .uint8 = @as(u8, 1),
         .uint32 = @as(u32, 3),
         .boolean = true,
@@ -442,7 +442,7 @@ test "calculate the root hash of a boolean" {
 }
 
 test "calculate root hash of an array of two Bitvector[128]" {
-    var deserialized: [2][128]bool = [2][128]bool{ a_bits, b_bits };
+    const deserialized: [2][128]bool = [2][128]bool{ a_bits, b_bits };
     var hashed: [32]u8 = undefined;
     try hashTreeRoot(@TypeOf(deserialized), deserialized, &hashed, std.testing.allocator);
 
@@ -461,7 +461,7 @@ test "calculate the root hash of an array of integers" {
 }
 
 test "calculate root hash of an array of three Bitvector[128]" {
-    var deserialized: [3][128]bool = [3][128]bool{ a_bits, b_bits, c_bits };
+    const deserialized: [3][128]bool = [3][128]bool{ a_bits, b_bits, c_bits };
     var hashed: [32]u8 = undefined;
     try hashTreeRoot(@TypeOf(deserialized), deserialized, &hashed, std.testing.allocator);
 
@@ -480,7 +480,7 @@ test "calculate root hash of an array of three Bitvector[128]" {
 }
 
 test "calculate the root hash of an array of five Bitvector[128]" {
-    var deserialized = [5][128]bool{ a_bits, b_bits, c_bits, d_bits, e_bits };
+    const deserialized = [5][128]bool{ a_bits, b_bits, c_bits, d_bits, e_bits };
     var hashed: [32]u8 = undefined;
     try hashTreeRoot(@TypeOf(deserialized), deserialized, &hashed, std.testing.allocator);
 
