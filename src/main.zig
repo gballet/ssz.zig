@@ -479,7 +479,7 @@ pub fn merkleize(chunks: []chunk, limit: ?usize, out: *[32]u8) anyerror!void {
     if (limit != null and chunks.len > limit.?) {
         return error.ChunkSizeExceedsLimit;
     }
-    var size = try nextPowOfTwo(limit orelse chunks.len);
+    const size = try nextPowOfTwo(limit orelse chunks.len);
 
     // Perform the merkelization
     switch (size) {
@@ -510,7 +510,7 @@ pub fn merkleize(chunks: []chunk, limit: ?usize, out: *[32]u8) anyerror!void {
 test "merkleize a string" {
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
-    var chunks = try pack([]const u8, "a" ** 100, &list);
+    const chunks = try pack([]const u8, "a" ** 100, &list);
     var out: [32]u8 = undefined;
     try merkleize(chunks, null, &out);
     // Build the expected tree
@@ -558,7 +558,7 @@ test "merkleize a boolean" {
 test "merkleize a bytes16 vector with one element" {
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
-    var chunks = try pack([16]u8, [_]u8{0xaa} ** 16, &list);
+    const chunks = try pack([16]u8, [_]u8{0xaa} ** 16, &list);
     var expected: [32]u8 = [_]u8{0xaa} ** 16 ++ [_]u8{0x00} ** 16;
     var out: [32]u8 = undefined;
     try merkleize(chunks, null, &out);
@@ -590,7 +590,7 @@ pub fn hashTreeRoot(comptime T: type, value: T, out: *[32]u8, allctr: Allocator)
         .Int, .Bool => {
             var list = ArrayList(u8).init(allctr);
             defer list.deinit();
-            var chunks = try pack(T, value, &list);
+            const chunks = try pack(T, value, &list);
             try merkleize(chunks, null, out);
         },
         .Array => {
@@ -602,13 +602,13 @@ pub fn hashTreeRoot(comptime T: type, value: T, out: *[32]u8, allctr: Allocator)
                 .Int => {
                     var list = ArrayList(u8).init(allctr);
                     defer list.deinit();
-                    var chunks = try pack(T, value, &list);
+                    const chunks = try pack(T, value, &list);
                     try merkleize(chunks, null, out);
                 },
                 .Bool => {
                     var list = ArrayList(u8).init(allctr);
                     defer list.deinit();
-                    var chunks = try packBits(value[0..], &list);
+                    const chunks = try packBits(value[0..], &list);
                     try merkleize(chunks, chunkCount(T), out);
                 },
                 .Array => {
@@ -632,7 +632,7 @@ pub fn hashTreeRoot(comptime T: type, value: T, out: *[32]u8, allctr: Allocator)
                         .Int => {
                             var list = ArrayList(u8).init(allctr);
                             defer list.deinit();
-                            var chunks = try pack(T, value, &list);
+                            const chunks = try pack(T, value, &list);
                             merkleize(chunks, null, out);
                         },
                         else => return error.UnSupportedPointerType,
