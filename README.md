@@ -3,7 +3,7 @@
 # ssz.zig
 A [Zig](https://ziglang.org) implementation of the [SSZ serialization protocol](https://github.com/ethereum/eth2.0-specs/blob/dev/ssz/simple-serialize.md).
 
-Tested with zig 0.11.0.
+Tested with zig 0.12.0.
 
 ## Serialization
 

@@ -94,13 +94,13 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
 
                     // Reserve the space for the offset
                     for (data) |_| {
-                        _ = try l.writer().writeIntLittle(u32, 0);
+                        _ = try l.writer().writeInt(u32, 0, std.builtin.Endian.little);
                     }
 
                     // Now serialize one item after the other
                     // and update the offset list with its location.
                     for (data) |item| {
-                        std.mem.writeIntLittle(u32, l.items[start .. start + 4][0..4], @as(u32, @truncate(l.items.len)));
+                        std.mem.writeInt(u32, l.items[start .. start + 4][0..4], @as(u32, @truncate(l.items.len)), std.builtin.Endian.little);
                         _ = try serialize(info.Array.child, item, l);
                         start += 4;
                     }
@@ -119,7 +119,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                 8, 16, 32, 64, 128, 256 => {},
                 else => return error.InvalidSerializedIntLengthType,
             }
-            _ = try l.writer().writeIntLittle(T, data);
+            _ = try l.writer().writeInt(T, data, std.builtin.Endian.little);
         },
         .Pointer => {
             // Bitlist[N] or list?
@@ -180,10 +180,10 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
         // Optionals are like unions, but their 0 value has to be 0.
         .Optional => {
             if (data != null) {
-                _ = try l.writer().writeIntLittle(u8, 1);
+                _ = try l.writer().writeInt(u8, 1, std.builtin.Endian.little);
                 try serialize(info.Optional.child, data.?, l);
             } else {
-                _ = try l.writer().writeIntLittle(u8, 0);
+                _ = try l.writer().writeInt(u8, 0, std.builtin.Endian.little);
             }
         },
         .Union => {
@@ -192,7 +192,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
             }
             inline for (info.Union.fields, 0..) |f, index| {
                 if (@intFromEnum(data) == index) {
-                    _ = try l.writer().writeIntLittle(u8, index);
+                    _ = try l.writer().writeInt(u8, index, std.builtin.Endian.little);
                     try serialize(f.type, @field(data, f.name), l);
                     return;
                 }
@@ -232,7 +232,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                 } else {
                     // first variable index is also the size of the list
                     // of indices. Recast that list as a []const u32.
-                    const size = std.mem.readIntLittle(u32, serialized[0..4]) / @sizeOf(u32);
+                    const size = std.mem.readInt(u32, serialized[0..4], std.builtin.Endian.little) / @sizeOf(u32);
                     const indices = std.mem.bytesAsSlice(u32, serialized[0 .. size * 4]);
                     var i = @as(usize, 0);
                     while (i < size) : (i += 1) {
@@ -249,7 +249,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
         .Bool => out.* = (serialized[0] == 1),
         .Int => {
             const N = @sizeOf(T);
-            out.* = std.mem.readIntLittle(T, serialized[0..N]);
+            out.* = std.mem.readInt(T, serialized[0..N], std.builtin.Endian.little);
         },
         .Optional => {
             const index: u8 = serialized[0];
@@ -359,7 +359,7 @@ fn mixInSelector(root: [32]u8, comptime selector: usize, out: *[32]u8) void {
     var hasher = sha256.init(sha256.Options{});
     hasher.update(root[0..]);
     var tmp = [_]u8{0} ** 32;
-    std.mem.writeIntLittle(@TypeOf(selector), tmp[0..@sizeOf(@TypeOf(selector))], selector);
+    std.mem.writeInt(@TypeOf(selector), tmp[0..@sizeOf(@TypeOf(selector))], selector, std.builtin.Endian.little);
     hasher.update(tmp[0..]);
     hasher.final(out[0..]);
 }
@@ -483,8 +483,8 @@ pub fn merkleize(chunks: []chunk, limit: ?usize, out: *[32]u8) anyerror!void {
 
     // Perform the merkelization
     switch (size) {
-        0 => std.mem.copy(u8, out.*[0..], zero_chunk[0..]),
-        1 => std.mem.copy(u8, out.*[0..], chunks[0][0..]),
+        0 => std.mem.copyForwards(u8, out.*[0..], zero_chunk[0..]),
+        1 => std.mem.copyForwards(u8, out.*[0..], chunks[0][0..]),
         else => {
             // Merkleize the left side. If the number of chunks
             // isn't enough to fill the entire width, complete
