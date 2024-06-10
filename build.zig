@@ -5,20 +5,20 @@ pub fn build(b: *Builder) void {
     const optimize = b.standardOptimizeOption(.{});
     const lib = b.addStaticLibrary(.{
         .name = "ssz",
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .cwd_relative = "src/main.zig" },
         .optimize = optimize,
         .target = target,
     });
     b.installArtifact(lib);
 
     const main_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .cwd_relative = "src/main.zig" },
         .optimize = optimize,
         .target = target,
     });
     const run_main_tests = b.addRunArtifact(main_tests);
     const tests_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/tests.zig" },
+        .root_source_file = .{ .cwd_relative = "src/tests.zig" },
         .optimize = optimize,
         .target = target,
     });
