@@ -54,6 +54,10 @@ fn isFixedSizeObject(comptime T: type) !bool {
     return true;
 }
 
+fn is_stable_container(comptime struc: std.builtin.Type.Struct) bool {
+    return std.meta.hasMethod(struc, "ssz_serialize") and std.meta.hasMethod(struc, "sc_max_size");
+}
+
 /// Provides the generic serialization of any `data` var to SSZ. The
 /// serialization is written to the `ArrayList` `l`.
 pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
@@ -136,7 +140,14 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                 else => return error.UnSupportedPointerType,
             }
         },
-        .Struct => {
+        .Struct => |struc| {
+            // Check if this is a stable container: if all fields
+            // are Optionals, and one constant is called `sc_max_fields`
+            // then we consider it's a stable container.
+            if (is_stable_container(struc)) {
+                return data.ssz_serialize(data, l);
+            }
+
             // First pass, accumulate the fixed sizes
             comptime var var_start = 0;
             inline for (info.Struct.fields) |field| {
