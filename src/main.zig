@@ -147,6 +147,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
         .Struct => |struc| {
             // First pass, accumulate the fixed sizes
             comptime var var_start = 0;
+            var var_start_stable_container: u32 = 0;
             comptime var is_stable_container: bool = struc.fields.len > 0;
             comptime var last_field_index: usize = 0;
             inline for (struc.fields, 0..) |field, i| {
@@ -156,9 +157,23 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                         var_start += @sizeOf(field.type);
                         is_stable_container = false;
                     },
+                    .Optional => |opt| {
+                        // for it to be a stable container, an optional field needs
+                        // not to be the last one in the struct.
+                        is_stable_container = is_stable_container and i + 1 < info.Struct.fields.len;
+                        var_start += 4;
+                        if (@field(data, field.name)) |_| {
+                            var_start_stable_container += switch (@typeInfo(opt.child)) {
+                                .Int, .Bool => @sizeOf(opt.child),
+                                else => 4,
+                            };
+                        }
+                    },
                     else => {
                         var_start += 4;
-                        is_stable_container = is_stable_container and (@typeInfo(field.type) == .Optional or i + 1 == info.Struct.fields.len);
+                        // for this to be a stable container, the only non-optional field
+                        // need to be the last one.
+                        is_stable_container = is_stable_container and i + 1 == info.Struct.fields.len;
                     },
                 }
             }
@@ -179,13 +194,32 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                     }
                     try serialize([max_size]bool, active_fields, l);
 
-                    // var var_acc = @as(usize, var_start); // variable part size accumulator
+                    var var_acc = @as(usize, var_start_stable_container); // variable part size accumulator
                     inline for (info.Struct.fields, 0..) |field, i| {
                         if (i == last_field_index) break;
                         if (@field(data, field.name)) |opt| {
-                            try serialize(@TypeOf(opt), opt, l);
+                            switch (@typeInfo(@TypeOf(opt))) {
+                                .Int, .Bool => try serialize(@TypeOf(opt), opt, l),
+                                else => {
+                                    try serialize(u32, @as(u32, @truncate(var_acc)), l);
+                                    var_acc += try serializedSize(@TypeOf(opt), opt);
+                                },
+                            }
                         }
                     }
+
+                    if (var_acc > var_start_stable_container) {
+                        inline for (info.Struct.fields, 0..) |field, i| {
+                            if (i == last_field_index) break;
+                            if (@field(data, field.name)) |opt| {
+                                switch (@typeInfo(@TypeOf(opt))) {
+                                    .Int, .Bool => {}, // skip fixed-size fields
+                                    else => try serialize(@TypeOf(opt), opt, l),
+                                }
+                            }
+                        }
+                    }
+
                     return;
                 }
             }
