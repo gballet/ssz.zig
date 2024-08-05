@@ -571,6 +571,16 @@ test "calculate the root hash of an union" {
 test "stable containers" {
     var array_list = std.ArrayList(u8).init(std.testing.allocator);
     defer array_list.deinit();
+    const Payload = struct {
+        a: ?u8 = null,
+        b: ?u32 = null,
+        reserved: StableContainerFiller(32),
+    };
+    const payload = Payload{
+        .a = 8,
+        .reserved = .{},
+    };
+    try serialize(Payload, payload, &array_list);
     // basic container
     const Shape1 = struct {
         side: ?u16,
@@ -591,13 +601,14 @@ test "stable containers" {
     for (stable_container_shape1_tests, 0..) |sct, i| {
         array_list.clearRetainingCapacity();
         try serialize(@TypeOf(sct.value), sct.value, &array_list);
-        const bin_end = array_list.items.len;
-        try std.fmt.format(array_list.writer(), "{s}", std.fmt.fmtSliceHexLower(array_list.items));
-        try std.testing.expectEqual(array_list.items[bin_end..], sct.serialized);
+        const got = try std.fmt.allocPrint(std.testing.allocator, "{}", .{std.fmt.fmtSliceHexLower(array_list.items[0..])});
+        defer std.testing.allocator.free(got);
+        try std.testing.expect(std.mem.eql(u8, got, sct.serialized));
         var result: [32]u8 = undefined;
         array_list.clearRetainingCapacity();
         try hashTreeRoot(Shape1, sct.value, &result, std.testing.allocator);
-        try std.fmt.format(array_list.writer(), "{s}", std.fmt.fmtSliceHexLower(&result));
-        try std.testing.expectEqual(array_list.items, sct.hash_tree_root);
+        const got_hash = try std.fmt.allocPrint(std.testing.allocator, "{}", .{std.fmt.fmtSliceHexLower(result[0..])});
+        defer std.testing.allocator.free(got_hash);
+        try std.testing.expect(std.mem.eql(u8, got_hash, sct.hash_tree_root));
     }
 }
