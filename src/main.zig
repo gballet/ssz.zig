@@ -54,6 +54,14 @@ fn isFixedSizeObject(comptime T: type) !bool {
     return true;
 }
 
+/// Used as a last field in stable containers, to indicate
+/// how many reserved fields can be used in the future.
+pub fn StableContainerFiller(comptime N: usize) type {
+    return struct {
+        pub const max_size = N;
+    };
+}
+
 /// Provides the generic serialization of any `data` var to SSZ. The
 /// serialization is written to the `ArrayList` `l`.
 pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
@@ -136,14 +144,49 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                 else => return error.UnSupportedPointerType,
             }
         },
-        .Struct => {
+        .Struct => |struc| {
             // First pass, accumulate the fixed sizes
             comptime var var_start = 0;
-            inline for (info.Struct.fields) |field| {
-                if (@typeInfo(field.type) == .Int or @typeInfo(field.type) == .Bool) {
-                    var_start += @sizeOf(field.type);
-                } else {
-                    var_start += 4;
+            comptime var is_stable_container: bool = struc.fields.len > 0;
+            comptime var last_field_index: usize = 0;
+            inline for (struc.fields, 0..) |field, i| {
+                last_field_index = i;
+                switch (@typeInfo(field.type)) {
+                    .Int, .Bool => {
+                        var_start += @sizeOf(field.type);
+                        is_stable_container = false;
+                    },
+                    else => {
+                        var_start += 4;
+                        is_stable_container = is_stable_container and (@typeInfo(field.type) == .Optional or i + 1 == info.Struct.fields.len);
+                    },
+                }
+            }
+            if (is_stable_container) {
+                // check that the type of the last field is
+                // the one we are looking for.
+                const last_field = struc.fields[last_field_index];
+                if (std.mem.indexOf(u8, @typeName(last_field.type), "StableContainerFiller") != null) {
+                    // build bitmap
+                    const max_size = last_field.type.max_size;
+                    var active_fields = [_]bool{false} ** max_size;
+                    inline for (struc.fields, 0..) |field, i| {
+                        if (i < last_field_index) {
+                            if (@field(data, field.name) != null) {
+                                active_fields[i] = true;
+                            }
+                        }
+                    }
+                    try serialize([max_size]bool, active_fields, l);
+
+                    // var var_acc = @as(usize, var_start); // variable part size accumulator
+                    inline for (info.Struct.fields, 0..) |field, i| {
+                        if (i == last_field_index) break;
+                        if (@field(data, field.name)) |opt| {
+                            try serialize(@TypeOf(opt), opt, l);
+                        }
+                    }
+                    return;
                 }
             }
 

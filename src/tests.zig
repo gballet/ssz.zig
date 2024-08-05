@@ -1,6 +1,7 @@
 const libssz = @import("./main.zig");
 const serialize = libssz.serialize;
 const deserialize = libssz.deserialize;
+const StableContainerFiller = libssz.StableContainerFiller;
 const chunkCount = libssz.chunkCount;
 const hashTreeRoot = libssz.hashTreeRoot;
 const std = @import("std");
@@ -566,4 +567,37 @@ test "calculate the root hash of an union" {
     sha256.hash(payload[0..], exp2[0..], sha256.Options{});
     try hashTreeRoot(Payload, Payload{ .boolean = true }, &out, std.testing.allocator);
     try expect(std.mem.eql(u8, out[0..], exp2[0..]));
+}
+test "stable containers" {
+    var array_list = std.ArrayList(u8).init(std.testing.allocator);
+    defer array_list.deinit();
+    // basic container
+    const Shape1 = struct {
+        side: ?u16,
+        color: ?u8,
+        radius: ?u16,
+        reserved: StableContainerFiller(4),
+    };
+    const stable_container_shape1_tests = [_]struct {
+        value: Shape1,
+        serialized: []const u8,
+        hash_tree_root: []const u8,
+    }{
+        .{ .value = Shape1{ .side = 0x42, .color = 1, .radius = 0x42, .reserved = .{} }, .serialized = "074200014200", .hash_tree_root = "37b28eab19bc3e246e55d2e2b2027479454c27ee006d92d4847c84893a162e6d" },
+        .{ .value = Shape1{ .side = 0x42, .color = 1, .radius = null, .reserved = .{} }, .serialized = "03420001", .hash_tree_root = "bfdb6fda9d02805e640c0f5767b8d1bb9ff4211498a5e2d7c0f36e1b88ce57ff" },
+        .{ .value = Shape1{ .side = null, .color = 1, .radius = null, .reserved = .{} }, .serialized = "0201", .hash_tree_root = "522edd7309c0041b8eb6a218d756af558e9cf4c816441ec7e6eef42dfa47bb98" },
+        .{ .value = Shape1{ .side = null, .color = 1, .radius = 0x42, .reserved = .{} }, .serialized = "06014200", .hash_tree_root = "f66d2c38c8d2afbd409e86c529dff728e9a4208215ca20ee44e49c3d11e145d8" },
+    };
+    for (stable_container_shape1_tests, 0..) |sct, i| {
+        array_list.clearRetainingCapacity();
+        try serialize(@TypeOf(sct.value), sct.value, &array_list);
+        const bin_end = array_list.items.len;
+        try std.fmt.format(array_list.writer(), "{s}", std.fmt.fmtSliceHexLower(array_list.items));
+        try std.testing.expectEqual(array_list.items[bin_end..], sct.serialized);
+        var result: [32]u8 = undefined;
+        array_list.clearRetainingCapacity();
+        try hashTreeRoot(Shape1, sct.value, &result, std.testing.allocator);
+        try std.fmt.format(array_list.writer(), "{s}", std.fmt.fmtSliceHexLower(&result));
+        try std.testing.expectEqual(array_list.items, sct.hash_tree_root);
+    }
 }
