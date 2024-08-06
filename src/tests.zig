@@ -619,7 +619,7 @@ test "stable containers" {
         .{ .value = Shape1{ .side = null, .color = 1, .radius = 0x42, .reserved = .{} }, .serialized = "06014200", .hash_tree_root = "f66d2c38c8d2afbd409e86c529dff728e9a4208215ca20ee44e49c3d11e145d8" },
     };
 
-    for (stable_container_shape1_tests, 0..) |sct, i| {
+    for (stable_container_shape1_tests) |sct| {
         array_list.clearRetainingCapacity();
         try serialize(@TypeOf(sct.value), sct.value, &array_list);
         const got = try std.fmt.allocPrint(std.testing.allocator, "{}", .{std.fmt.fmtSliceHexLower(array_list.items[0..])});
@@ -645,7 +645,7 @@ test "stable containers" {
         .{ .value = Shape2{ .side = null, .color = 1, .radius = 0x42, .reserved = .{} }, .serialized = "06014200", .hash_tree_root = "e823471310312d52aa1135d971a3ed72ba041ade3ec5b5077c17a39d73ab17c5" },
     };
 
-    for (stable_container_shape2_tests, 0..) |sct, i| {
+    for (stable_container_shape2_tests) |sct| {
         array_list.clearRetainingCapacity();
         try serialize(@TypeOf(sct.value), sct.value, &array_list);
         const got = try std.fmt.allocPrint(std.testing.allocator, "{}", .{std.fmt.fmtSliceHexLower(array_list.items[0..])});
@@ -672,7 +672,7 @@ test "stable containers" {
         .{ .value = Shape3{ .side = null, .colors = &[_]u8{ 1, 2 }, .radius = 0x42, .reserved = .{} }, .serialized = "060600000042000102", .hash_tree_root = "00fc0cecc200a415a07372d5d5b8bc7ce49f52504ed3da0336f80a26d811c7bf" },
     };
 
-    for (stable_container_shape3_tests, 0..) |sct, i| {
+    for (stable_container_shape3_tests) |sct| {
         array_list.clearRetainingCapacity();
         try serialize(@TypeOf(sct.value), sct.value, &array_list);
         const got = try std.fmt.allocPrint(std.testing.allocator, "{}", .{std.fmt.fmtSliceHexLower(array_list.items[0..])});
