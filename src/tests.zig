@@ -618,13 +618,22 @@ test "stable containers" {
         .{ .value = Shape1{ .side = null, .color = 1, .radius = null, .reserved = .{} }, .serialized = "0201", .hash_tree_root = "522edd7309c0041b8eb6a218d756af558e9cf4c816441ec7e6eef42dfa47bb98" },
         .{ .value = Shape1{ .side = null, .color = 1, .radius = 0x42, .reserved = .{} }, .serialized = "06014200", .hash_tree_root = "f66d2c38c8d2afbd409e86c529dff728e9a4208215ca20ee44e49c3d11e145d8" },
     };
+
     for (stable_container_shape1_tests, 0..) |sct, i| {
         array_list.clearRetainingCapacity();
         try serialize(@TypeOf(sct.value), sct.value, &array_list);
         const got = try std.fmt.allocPrint(std.testing.allocator, "{}", .{std.fmt.fmtSliceHexLower(array_list.items[0..])});
         defer std.testing.allocator.free(got);
         try std.testing.expect(std.mem.eql(u8, got, sct.serialized));
+        // var result: [32]u8 = undefined;
+        // array_list.clearRetainingCapacity();
+        // try hashTreeRoot(Shape1, sct.value, &result, std.testing.allocator);
+        // const got_hash = try std.fmt.allocPrint(std.testing.allocator, "{}", .{std.fmt.fmtSliceHexLower(result[0..])});
+        // defer std.testing.allocator.free(got_hash);
+        // std.debug.print("{}: {s} {s}\n", .{ i, got_hash, sct.hash_tree_root[0..] });
+        // try std.testing.expect(std.mem.eql(u8, got_hash, sct.hash_tree_root));
     }
+
     const stable_container_shape2_tests = [_]struct {
         value: Shape2,
         serialized: []const u8,
@@ -635,13 +644,22 @@ test "stable containers" {
         .{ .value = Shape2{ .side = null, .color = 1, .radius = null, .reserved = .{} }, .serialized = "0201", .hash_tree_root = "9893ecf9b68030ff23c667a5f2e4a76538a8e2ab48fd060a524888a66fb938c9" },
         .{ .value = Shape2{ .side = null, .color = 1, .radius = 0x42, .reserved = .{} }, .serialized = "06014200", .hash_tree_root = "e823471310312d52aa1135d971a3ed72ba041ade3ec5b5077c17a39d73ab17c5" },
     };
+
     for (stable_container_shape2_tests, 0..) |sct, i| {
         array_list.clearRetainingCapacity();
         try serialize(@TypeOf(sct.value), sct.value, &array_list);
         const got = try std.fmt.allocPrint(std.testing.allocator, "{}", .{std.fmt.fmtSliceHexLower(array_list.items[0..])});
         defer std.testing.allocator.free(got);
         try std.testing.expect(std.mem.eql(u8, got, sct.serialized));
+        // var result: [32]u8 = undefined;
+        // array_list.clearRetainingCapacity();
+        // try hashTreeRoot(Shape2, sct.value, &result, std.testing.allocator);
+        // const got_hash = try std.fmt.allocPrint(std.testing.allocator, "{}", .{std.fmt.fmtSliceHexLower(result[0..])});
+        // defer std.testing.allocator.free(got_hash);
+        // std.debug.print("{}: {s} {s}\n", .{ i, got_hash, sct.hash_tree_root[0..] });
+        // try std.testing.expect(std.mem.eql(u8, got_hash, sct.hash_tree_root));
     }
+
     const stable_container_shape3_tests = [_]struct {
         value: Shape3,
         serialized: []const u8,
@@ -660,6 +678,13 @@ test "stable containers" {
         const got = try std.fmt.allocPrint(std.testing.allocator, "{}", .{std.fmt.fmtSliceHexLower(array_list.items[0..])});
         defer std.testing.allocator.free(got);
         try std.testing.expect(std.mem.eql(u8, got, sct.serialized));
+        // var result: [32]u8 = undefined;
+        // array_list.clearRetainingCapacity();
+        // try hashTreeRoot(Shape3, sct.value, &result, std.testing.allocator);
+        // const got_hash = try std.fmt.allocPrint(std.testing.allocator, "{}", .{std.fmt.fmtSliceHexLower(result[0..])});
+        // defer std.testing.allocator.free(got_hash);
+        // std.debug.print("{}: {s} {s}\n", .{ i, got_hash, sct.hash_tree_root[0..] });
+        // try std.testing.expect(std.mem.eql(u8, got_hash, sct.hash_tree_root));
 
         var shape3: Shape3 = undefined;
         try deserialize(Shape3, array_list.items, &shape3);
