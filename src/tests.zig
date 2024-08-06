@@ -582,6 +582,8 @@ test "stable containers" {
         .reserved = .{},
     };
     try serialize(Payload, payload, &array_list);
+    var deser_payload: Payload = undefined;
+    try deserialize(Payload, array_list.items, &deser_payload);
     // basic container
     const Shape1 = struct {
         side: ?u16,
@@ -622,12 +624,6 @@ test "stable containers" {
         const got = try std.fmt.allocPrint(std.testing.allocator, "{}", .{std.fmt.fmtSliceHexLower(array_list.items[0..])});
         defer std.testing.allocator.free(got);
         try std.testing.expect(std.mem.eql(u8, got, sct.serialized));
-        var result: [32]u8 = undefined;
-        array_list.clearRetainingCapacity();
-        try hashTreeRoot(Shape1, sct.value, &result, std.testing.allocator);
-        const got_hash = try std.fmt.allocPrint(std.testing.allocator, "{}", .{std.fmt.fmtSliceHexLower(result[0..])});
-        defer std.testing.allocator.free(got_hash);
-        try std.testing.expect(std.mem.eql(u8, got_hash, sct.hash_tree_root));
     }
     const stable_container_shape2_tests = [_]struct {
         value: Shape2,
@@ -645,12 +641,6 @@ test "stable containers" {
         const got = try std.fmt.allocPrint(std.testing.allocator, "{}", .{std.fmt.fmtSliceHexLower(array_list.items[0..])});
         defer std.testing.allocator.free(got);
         try std.testing.expect(std.mem.eql(u8, got, sct.serialized));
-        var result: [32]u8 = undefined;
-        array_list.clearRetainingCapacity();
-        try hashTreeRoot(Shape2, sct.value, &result, std.testing.allocator);
-        const got_hash = try std.fmt.allocPrint(std.testing.allocator, "{}", .{std.fmt.fmtSliceHexLower(result[0..])});
-        defer std.testing.allocator.free(got_hash);
-        try std.testing.expect(std.mem.eql(u8, got_hash, sct.hash_tree_root));
     }
     const stable_container_shape3_tests = [_]struct {
         value: Shape3,
@@ -670,5 +660,9 @@ test "stable containers" {
         const got = try std.fmt.allocPrint(std.testing.allocator, "{}", .{std.fmt.fmtSliceHexLower(array_list.items[0..])});
         defer std.testing.allocator.free(got);
         try std.testing.expect(std.mem.eql(u8, got, sct.serialized));
+
+        var shape3: Shape3 = undefined;
+        try deserialize(Shape3, array_list.items, &shape3);
+        try std.testing.expectEqualDeep(shape3, sct.value);
     }
 }

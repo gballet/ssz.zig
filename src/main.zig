@@ -341,17 +341,68 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
         // Data is not copied in this function, copy is therefore
         // the responsibility of the caller.
         .Pointer => out.* = serialized[0..],
-        .Struct => {
+        .Struct => |struc| {
             // Calculate the number of variable fields in the
-            // struct.
+            // struct. Also scan the fields to determine if
+            comptime var is_stable_container = struc.fields.len > 0;
             comptime var n_var_fields = 0;
+            comptime var last_field_index = 0;
             comptime {
-                for (info.Struct.fields) |field| {
+                for (struc.fields, 0..) |field, i| {
+                    last_field_index = i;
                     switch (@typeInfo(field.type)) {
-                        .Int, .Bool => {},
-                        else => n_var_fields += 1,
+                        .Int, .Bool => {
+                            is_stable_container = false;
+                        },
+                        .Optional => {
+                            // for it to be a stable container, an optional field needs
+                            // not to be the last one in the struct.
+                            is_stable_container = is_stable_container and i + 1 < info.Struct.fields.len;
+                            n_var_fields += 1;
+                        },
+                        else => {
+                            // for this to be a stable container, the only non-optional field
+                            // need to be the last one.
+                            is_stable_container = is_stable_container and i + 1 == info.Struct.fields.len;
+                            n_var_fields += 1;
+                        },
                     }
                 }
+            }
+
+            if (is_stable_container) {
+                const max_size = struc.fields[last_field_index].type.max_size;
+                var bitmap: [max_size]bool = undefined;
+                try deserialize([max_size]bool, serialized, &bitmap);
+                var field_offset: usize = (max_size + 7) / 8;
+
+                inline for (struc.fields, 0..) |field, i| {
+                    if (i + 1 == struc.fields.len) {
+                        @field(out.*, field.name) = .{};
+                        return;
+                    }
+                    if (bitmap[i]) {
+                        const opt = @typeInfo(field.type).Optional;
+                        var temp: opt.child = undefined;
+                        switch (@typeInfo(opt.child)) {
+                            .Int, .Bool => {
+                                try deserialize(opt.child, serialized[field_offset .. field_offset + @sizeOf(opt.child)], &temp);
+                                field_offset += @sizeOf(opt.child);
+                            },
+                            else => {
+                                var var_offset: u32 = undefined;
+                                try deserialize(u32, serialized[field_offset .. field_offset + @sizeOf(u32)], &var_offset);
+                                var_offset += @as(u32, (max_size + 7) / 8);
+                                field_offset += @sizeOf(u32);
+                                try deserialize(opt.child, serialized[var_offset..], &temp);
+                            },
+                        }
+                        @field(out.*, field.name) = temp;
+                    } else {
+                        @field(out.*, field.name) = null;
+                    }
+                }
+                return;
             }
 
             var indices: [n_var_fields]u32 = undefined;
