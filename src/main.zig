@@ -54,6 +54,14 @@ fn isFixedSizeObject(comptime T: type) !bool {
     return true;
 }
 
+/// Used as a last field in stable containers, to indicate
+/// how many reserved fields can be used in the future.
+pub fn StableContainerFiller(comptime N: usize) type {
+    return struct {
+        pub const max_size = N;
+    };
+}
+
 /// Provides the generic serialization of any `data` var to SSZ. The
 /// serialization is written to the `ArrayList` `l`.
 pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
@@ -136,14 +144,83 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                 else => return error.UnSupportedPointerType,
             }
         },
-        .Struct => {
+        .Struct => |struc| {
             // First pass, accumulate the fixed sizes
             comptime var var_start = 0;
-            inline for (info.Struct.fields) |field| {
-                if (@typeInfo(field.type) == .Int or @typeInfo(field.type) == .Bool) {
-                    var_start += @sizeOf(field.type);
-                } else {
-                    var_start += 4;
+            var var_start_stable_container: u32 = 0;
+            comptime var is_stable_container: bool = struc.fields.len > 0;
+            comptime var last_field_index: usize = 0;
+            inline for (struc.fields, 0..) |field, i| {
+                last_field_index = i;
+                switch (@typeInfo(field.type)) {
+                    .Int, .Bool => {
+                        var_start += @sizeOf(field.type);
+                        is_stable_container = false;
+                    },
+                    .Optional => |opt| {
+                        // for it to be a stable container, an optional field needs
+                        // not to be the last one in the struct.
+                        is_stable_container = is_stable_container and i + 1 < info.Struct.fields.len;
+                        var_start += 4;
+                        if (@field(data, field.name)) |_| {
+                            var_start_stable_container += switch (@typeInfo(opt.child)) {
+                                .Int, .Bool => @sizeOf(opt.child),
+                                else => 4,
+                            };
+                        }
+                    },
+                    else => {
+                        var_start += 4;
+                        // for this to be a stable container, the only non-optional field
+                        // need to be the last one.
+                        is_stable_container = is_stable_container and i + 1 == info.Struct.fields.len;
+                    },
+                }
+            }
+            if (is_stable_container) {
+                // check that the type of the last field is
+                // the one we are looking for.
+                const last_field = struc.fields[last_field_index];
+                if (std.mem.indexOf(u8, @typeName(last_field.type), "StableContainerFiller") != null) {
+                    // build bitmap
+                    const max_size = last_field.type.max_size;
+                    var active_fields = [_]bool{false} ** max_size;
+                    inline for (struc.fields, 0..) |field, i| {
+                        if (i < last_field_index) {
+                            if (@field(data, field.name) != null) {
+                                active_fields[i] = true;
+                            }
+                        }
+                    }
+                    try serialize([max_size]bool, active_fields, l);
+
+                    var var_acc = @as(usize, var_start_stable_container); // variable part size accumulator
+                    inline for (info.Struct.fields, 0..) |field, i| {
+                        if (i == last_field_index) break;
+                        if (@field(data, field.name)) |opt| {
+                            switch (@typeInfo(@TypeOf(opt))) {
+                                .Int, .Bool => try serialize(@TypeOf(opt), opt, l),
+                                else => {
+                                    try serialize(u32, @as(u32, @truncate(var_acc)), l);
+                                    var_acc += try serializedSize(@TypeOf(opt), opt);
+                                },
+                            }
+                        }
+                    }
+
+                    if (var_acc > var_start_stable_container) {
+                        inline for (info.Struct.fields, 0..) |field, i| {
+                            if (i == last_field_index) break;
+                            if (@field(data, field.name)) |opt| {
+                                switch (@typeInfo(@TypeOf(opt))) {
+                                    .Int, .Bool => {}, // skip fixed-size fields
+                                    else => try serialize(@TypeOf(opt), opt, l),
+                                }
+                            }
+                        }
+                    }
+
+                    return;
                 }
             }
 
@@ -264,17 +341,68 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
         // Data is not copied in this function, copy is therefore
         // the responsibility of the caller.
         .Pointer => out.* = serialized[0..],
-        .Struct => {
+        .Struct => |struc| {
             // Calculate the number of variable fields in the
-            // struct.
+            // struct. Also scan the fields to determine if
+            comptime var is_stable_container = struc.fields.len > 0;
             comptime var n_var_fields = 0;
+            comptime var last_field_index = 0;
             comptime {
-                for (info.Struct.fields) |field| {
+                for (struc.fields, 0..) |field, i| {
+                    last_field_index = i;
                     switch (@typeInfo(field.type)) {
-                        .Int, .Bool => {},
-                        else => n_var_fields += 1,
+                        .Int, .Bool => {
+                            is_stable_container = false;
+                        },
+                        .Optional => {
+                            // for it to be a stable container, an optional field needs
+                            // not to be the last one in the struct.
+                            is_stable_container = is_stable_container and i + 1 < info.Struct.fields.len;
+                            n_var_fields += 1;
+                        },
+                        else => {
+                            // for this to be a stable container, the only non-optional field
+                            // need to be the last one.
+                            is_stable_container = is_stable_container and i + 1 == info.Struct.fields.len;
+                            n_var_fields += 1;
+                        },
                     }
                 }
+            }
+
+            if (is_stable_container) {
+                const max_size = struc.fields[last_field_index].type.max_size;
+                var bitmap: [max_size]bool = undefined;
+                try deserialize([max_size]bool, serialized, &bitmap);
+                var field_offset: usize = (max_size + 7) / 8;
+
+                inline for (struc.fields, 0..) |field, i| {
+                    if (i + 1 == struc.fields.len) {
+                        @field(out.*, field.name) = .{};
+                        return;
+                    }
+                    if (bitmap[i]) {
+                        const opt = @typeInfo(field.type).Optional;
+                        var temp: opt.child = undefined;
+                        switch (@typeInfo(opt.child)) {
+                            .Int, .Bool => {
+                                try deserialize(opt.child, serialized[field_offset .. field_offset + @sizeOf(opt.child)], &temp);
+                                field_offset += @sizeOf(opt.child);
+                            },
+                            else => {
+                                var var_offset: u32 = undefined;
+                                try deserialize(u32, serialized[field_offset .. field_offset + @sizeOf(u32)], &var_offset);
+                                var_offset += @as(u32, (max_size + 7) / 8);
+                                field_offset += @sizeOf(u32);
+                                try deserialize(opt.child, serialized[var_offset..], &temp);
+                            },
+                        }
+                        @field(out.*, field.name) = temp;
+                    } else {
+                        @field(out.*, field.name) = null;
+                    }
+                }
+                return;
             }
 
             var indices: [n_var_fields]u32 = undefined;

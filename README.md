@@ -54,6 +54,15 @@ Supported types:
  * optionals
  * unions
 
+## Stable containers
+
+A `struct` is automatically encoded as a [stable container](https://stabilitynow.box/) if it abides by the following rules:
+
+ 1. All fields except the last one are `Optional`,
+ 2. The last field is an empty structure with a `max_size` constant set to the stable container's [maximum future size](https://eips.ethereum.org/EIPS/eip-7495#stablecontainern). That last field is ignored when serializing the stable container.
+ 
+ The helper factory function `StableContainerFiller(N)` can generate such a structure, and its usage is recommended in order to keep code compatible with future changes to the specification. Usage of this factory method is not, however, mandatory.
+
 ## Contributing
 
 Simply create an issue or a PR.
