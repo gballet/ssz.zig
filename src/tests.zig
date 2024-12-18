@@ -228,6 +228,49 @@ test "serializes a union" {
     }
 }
 
+test "(de)serializes a type with a custom serialization method" {
+    const MyCustomSerializingType = struct {
+        len: usize,
+        buffer: [100]u8,
+
+        const Self = @This();
+
+        pub fn sszEncode(self: *const Self, list: *ArrayList(u8)) !void {
+            try list.append(@truncate(self.len));
+            try list.appendSlice(self.buffer[0..self.len]);
+        }
+
+        pub fn sszDecode(serialized: []const u8, out: *Self) !void {
+            if (serialized.len == 0) {
+                return error.IndexOutOfBounds;
+            }
+
+            out.len = @intCast(serialized[0]);
+            if (out.len > serialized.len - 1) {
+                return error.IndexOutOfBounds;
+            }
+
+            std.mem.copyForwards(u8, out.buffer[0..], serialized[1..]);
+        }
+    };
+
+    var before: MyCustomSerializingType = .{ .len = 10, .buffer = [_]u8{0} ** 100 };
+    before.buffer[0] = 1;
+    before.buffer[9] = 100;
+
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    try serialize(MyCustomSerializingType, before, &list);
+
+    try expect(list.items.len == 11);
+
+    var after: MyCustomSerializingType = undefined;
+    try deserialize(MyCustomSerializingType, list.items, &after);
+
+    try expect(before.len == after.len);
+    try expect(std.mem.eql(u8, before.buffer[0..before.len], after.buffer[0..after.len]));
+}
+
 test "deserializes an u8" {
     const payload = [_]u8{0x55};
     var i: u8 = 0;

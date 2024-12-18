@@ -57,6 +57,10 @@ fn isFixedSizeObject(comptime T: type) !bool {
 /// Provides the generic serialization of any `data` var to SSZ. The
 /// serialization is written to the `ArrayList` `l`.
 pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
+    // shortcut if the type implements its own encode method
+    if (comptime std.meta.hasFn(T, "sszEncode")) {
+        return data.sszEncode(l);
+    }
     const info = @typeInfo(T);
     switch (info) {
         .Array => {
@@ -208,6 +212,11 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
 /// possible trailing data) and deserializes it into the `T` object pointed
 /// at by `out`.
 pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
+    // shortcut if the type implements its own decode method
+    if (comptime std.meta.hasFn(T, "sszDecode")) {
+        return T.sszDecode(serialized, out);
+    }
+
     const info = @typeInfo(T);
     switch (info) {
         .Array => {
