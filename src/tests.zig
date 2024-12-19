@@ -1,4 +1,5 @@
 const libssz = @import("ssz.zig");
+const utils = libssz.utils;
 const serialize = libssz.serialize;
 const deserialize = libssz.deserialize;
 const chunkCount = libssz.chunkCount;
@@ -664,4 +665,19 @@ test "calculate the root hash of an union" {
     sha256.hash(payload[0..], exp2[0..], sha256.Options{});
     try hashTreeRoot(Payload, Payload{ .boolean = true }, &out, std.testing.allocator);
     try expect(std.mem.eql(u8, out[0..], exp2[0..]));
+}
+
+test "(de)serialize List[N]" {
+    const MAX_VALIDATORS_PER_COMMITTEE: usize = 2048;
+    const ListValidatorIndex = utils.List(u64, MAX_VALIDATORS_PER_COMMITTEE);
+    var attesting_indices = try ListValidatorIndex.init(0);
+    for (0..10) |i| {
+        try attesting_indices.append(i * 100);
+    }
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    try serialize(ListValidatorIndex, attesting_indices, &list);
+    var attesting_indices_deser: ListValidatorIndex = undefined;
+    try deserialize(ListValidatorIndex, list.items, &attesting_indices_deser);
+    try expect(attesting_indices.eql(&attesting_indices_deser));
 }

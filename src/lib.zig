@@ -2,6 +2,7 @@
 //! data structures with the SSZ method.
 
 const std = @import("std");
+pub const utils = @import("./utils.zig");
 const ArrayList = std.ArrayList;
 const builtin = std.builtin;
 const sha256 = std.crypto.hash.sha2.Sha256;
@@ -43,7 +44,7 @@ fn serializedSize(comptime T: type, data: T) !usize {
 }
 
 /// Returns true if an object is of fixed size
-fn isFixedSizeObject(comptime T: type) !bool {
+pub fn isFixedSizeObject(comptime T: type) !bool {
     const info = @typeInfo(T);
     switch (info) {
         .Bool, .Int, .Null => return true,
