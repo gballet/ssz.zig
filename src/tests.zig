@@ -677,7 +677,7 @@ test "(de)serialize List[N]" {
     var list = ArrayList(u8).init(std.testing.allocator);
     defer list.deinit();
     try serialize(ListValidatorIndex, attesting_indices, &list);
-    var attesting_indices_deser: ListValidatorIndex = undefined;
+    var attesting_indices_deser = try ListValidatorIndex.init(0);
     try deserialize(ListValidatorIndex, list.items, &attesting_indices_deser);
     try expect(attesting_indices.eql(&attesting_indices_deser));
 }
