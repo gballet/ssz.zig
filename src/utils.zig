@@ -5,58 +5,17 @@ const deserialize = lib.deserialize;
 const isFixedSizeObject = lib.isFixedSizeObject;
 const ArrayList = std.ArrayList;
 
-pub fn List(comptime T: type, comptime max_size: usize) type {
+/// Implements the SSZ `List[N]` container.
+pub fn List(comptime T: type, comptime N: usize) type {
     return struct {
         const Self = @This();
-        const Len = std.math.IntFittingRange(0, max_size);
         const Item = T;
+        const Inner = @TypeOf(Self.inner);
 
-        len: Len,
-        buffer: [max_size]T = undefined,
+        inner: std.BoundedArray(T, N),
 
         pub fn sszEncode(self: *const Self, l: *ArrayList(u8)) !void {
-            // BitList[N]
-            if (Self.Item == bool) {
-                var byte: u8 = 0;
-                for (self.buffer, 0..) |bit, index| {
-                    if (bit) {
-                        byte |= @as(u8, 1) << @as(u3, @truncate(index));
-                    }
-
-                    if (index % 8 == 7) {
-                        try l.append(byte);
-                        byte = 0;
-                    }
-                }
-
-                // Write the last byte if the length
-                // is not byte-aligned
-                if (self.len % 8 != 0) {
-                    try l.append(byte);
-                }
-            } else // List[N]
-            if (try isFixedSizeObject(Self.Item)) {
-                var i: usize = 0;
-                while (i < self.len) : (i += 1) {
-                    try serialize(Self.Item, self.buffer[i], l);
-                }
-            } else {
-                var start = l.items.len;
-
-                // Reserve the space for the offset
-                const offset = [_]u8{ 0, 0, 0, 0 };
-                for (self.buffer) |_| {
-                    _ = try l.writer().write(offset[0..4]);
-                }
-
-                // Now serialize one item after the other
-                // and update the offset list with its location.
-                for (self.buffer) |item| {
-                    std.mem.writeInt(u32, l.items[start .. start + 4][0..4], @as(u32, @truncate(l.items.len)), std.builtin.Endian.little);
-                    _ = try serialize(Self.Item, item, l);
-                    start += 4;
-                }
-            }
+            try serialize([]const Item, self.inner.slice(), l);
         }
 
         pub fn sszDecode(serialized: []const u8, out: *Self) !void {
@@ -71,12 +30,12 @@ pub fn List(comptime T: type, comptime max_size: usize) type {
                     }
                 }
             } else if (try isFixedSizeObject(Self.Item)) {
-                out.len = 0;
                 var i: usize = 0;
                 const pitch = @sizeOf(Self.Item);
                 while (i < serialized.len) : (i += pitch) {
-                    try deserialize(Self.Item, serialized[i .. i + pitch], &out.buffer[out.len]);
-                    out.len += 1;
+                    var item: Self.Item = undefined;
+                    try deserialize(Self.Item, serialized[i .. i + pitch], &item);
+                    try out.append(item);
                 }
             } else {
                 // first variable index is also the size of the list
@@ -90,49 +49,38 @@ pub fn List(comptime T: type, comptime max_size: usize) type {
                     if (start >= serialized.len or end > serialized.len) {
                         return error.IndexOutOfBounds;
                     }
-                    try deserialize(Self.Item, serialized[start..end], &out.buffer[i]);
+                    const item = try out.inner.addOne();
+                    try deserialize(Self.Item, serialized[start..end], item);
                 }
             }
         }
 
         pub fn init(len: usize) error{Overflow}!Self {
-            if (len > max_size) return error.Overflow;
-            return Self{ .len = @intCast(len) };
+            return .{ .inner = try std.BoundedArray(T, N).init(len) };
         }
 
         pub fn eql(self: *const Self, other: *Self) bool {
-            return (self.len == other.len) and std.mem.eql(Self.Item, self.buffer[0..self.len], other.buffer[0..self.len]);
+            return (self.inner.len == other.inner.len) and std.mem.eql(Self.Item, self.inner.constSlice()[0..self.inner.len], other.inner.constSlice()[0..other.inner.len]);
         }
 
         pub fn append(self: *Self, item: Self.Item) error{Overflow}!void {
-            if (self.len == max_size) {
-                return error.Overflow;
-            }
-
-            self.buffer[self.len] = item;
-            self.len += 1;
+            return self.inner.append(item);
         }
 
         pub fn slice(self: *Self) []T {
-            return self.buffer[0..self.len];
+            return self.inner.slice();
         }
 
         pub fn fromSlice(m: []const T) error{Overflow}!Self {
-            var list = try init(m.len);
-            @memcpy(list.slice(), m);
-            return list;
+            return .{ .inner = try Inner.fromSlice(m) };
         }
 
         pub fn get(self: Self, i: usize) T {
-            return self.slice()[i];
+            return self.inner.get(i);
         }
 
         pub fn set(self: *Self, i: usize, item: T) void {
-            self.slice()[i] = item;
-        }
-
-        pub fn fromBoundedArrayAligned(baa: anytype) error{Overflow}!Self {
-            return fromSlice(baa.slice());
+            self.inner.set(i, item);
         }
     };
 }
