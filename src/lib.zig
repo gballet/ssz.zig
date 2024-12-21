@@ -133,8 +133,27 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                     if (@sizeOf(info.Pointer.child) == 1) {
                         _ = try l.writer().write(data);
                     } else {
-                        for (data) |item| {
-                            try serialize(@TypeOf(item), item, l);
+                        if (try isFixedSizeObject(info.Pointer.child)) {
+                            for (data) |item| {
+                                try serialize(@TypeOf(item), item, l);
+                            }
+                        } else {
+                            // Size of the buffer before anything is
+                            // written to it.
+                            var start = l.items.len;
+
+                            // Reserve the space for the offset
+                            for (data) |_| {
+                                _ = try l.writer().writeInt(u32, 0, std.builtin.Endian.little);
+                            }
+
+                            // Now serialize one item after the other
+                            // and update the offset list with its location.
+                            for (data) |item| {
+                                std.mem.writeInt(u32, l.items[start .. start + 4][0..4], @as(u32, @truncate(l.items.len)), std.builtin.Endian.little);
+                                _ = try serialize(info.Pointer.child, item, l);
+                                start += 4;
+                            }
                         }
                     }
                 },
