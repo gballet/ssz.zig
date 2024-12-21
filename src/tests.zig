@@ -422,6 +422,20 @@ test "serialize/deserialize a u256" {
     try expect(std.mem.eql(u8, data[0..], output[0..]));
 }
 
+test "(de)serialize a .One pointer in a struct" {
+    var a: u32 = 1;
+    const b = .{
+        .a = &a,
+    };
+
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    try serialize(@TypeOf(b), b, &list);
+    var c_val: u32 = undefined;
+    var c: @TypeOf(b) = .{ .a = &c_val };
+    try deserialize(@TypeOf(b), list.items, &c);
+}
+
 test "chunk count of basic types" {
     try expect(chunkCount(bool) == 1);
     try expect(chunkCount(u8) == 1);

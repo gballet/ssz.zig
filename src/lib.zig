@@ -20,6 +20,7 @@ const BYTES_PER_LENGTH_OFFSET = 4;
 fn serializedSize(comptime T: type, data: T) !usize {
     const info = @typeInfo(T);
     return switch (info) {
+        .Int => @sizeOf(T),
         .Array => data.len,
         .Pointer => switch (info.Pointer.size) {
             .Slice => data.len,
@@ -128,7 +129,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
         .Pointer => {
             // Bitlist[N] or list?
             switch (info.Pointer.size) {
-                .Slice, .One => {
+                .Slice => {
                     if (@sizeOf(info.Pointer.child) == 1) {
                         _ = try l.writer().write(data);
                     } else {
@@ -137,6 +138,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                         }
                     }
                 },
+                .One => try serialize(info.Pointer.child, data.*, l),
                 else => return error.UnSupportedPointerType,
             }
         },
@@ -270,9 +272,15 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                 out.* = null;
             }
         },
-        // Data is not copied in this function, copy is therefore
-        // the responsibility of the caller.
-        .Pointer => out.* = serialized[0..],
+        .Pointer => |ptr| switch (ptr.size) {
+            .Slice => if (@sizeOf(ptr.child) == 1) {
+                // Data is not copied in this function, copy is therefore
+                // the responsibility of the caller.
+                out.* = serialized[0..];
+            } else {},
+            .One => return deserialize(ptr.child, serialized, out.*),
+            else => return error.UnSupportedPointerType,
+        },
         .Struct => {
             // Calculate the number of variable fields in the
             // struct.
