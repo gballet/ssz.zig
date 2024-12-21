@@ -146,9 +146,10 @@ test "serializes a structure without variable fields" {
 test "serializes a structure with variable fields" {
     // Taken from ssz.cr
     const data = .{
-        .name = "James",
+        // The cast is necessary, otherwise the type is interpreted as `const [0..5]u8`.
+        .name = @as([]const u8, "James"),
         .age = @as(u8, 32),
-        .company = "DEV Inc.",
+        .company = @as([]const u8, "DEV Inc."),
     };
     const serialized_data = [_]u8{ 9, 0, 0, 0, 32, 14, 0, 0, 0, 74, 97, 109, 101, 115, 68, 69, 86, 32, 73, 110, 99, 46 };
 
