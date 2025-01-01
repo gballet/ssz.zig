@@ -282,8 +282,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T, allocator:
                         @memcpy(buf[0..], serialized[0..]);
                         out.* = buf;
                     }
-                } else {
-                }
+                } else {}
             },
             .One => {
                 if (allocator != null) {
