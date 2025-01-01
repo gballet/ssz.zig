@@ -277,7 +277,27 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                 // Data is not copied in this function, copy is therefore
                 // the responsibility of the caller.
                 out.* = serialized[0..];
-            } else {},
+            } else {
+                if (try isFixedSizeObject(ptr.child)) {
+                    comptime var i = 0;
+                    const pitch = @sizeOf(ptr.child);
+                    inline while (i < out.len) : (i += pitch) {
+                        try deserialize(ptr.child, serialized[i * pitch .. (i + 1) * pitch], &out[i]);
+                    }
+                } else {
+                    const size = std.mem.readInt(u32, serialized[0..4], std.builtin.Endian.little) / @sizeOf(u32);
+                    const indices = std.mem.bytesAsSlice(u32, serialized[0 .. size * 4]);
+                    var i = @as(usize, 0);
+                    while (i < size) : (i += 1) {
+                        const end = if (i < size - 1) indices[i + 1] else serialized.len;
+                        const start = indices[i];
+                        if (start >= serialized.len or end > serialized.len) {
+                            return error.IndexOutOfBounds;
+                        }
+                        try deserialize(ptr.child, serialized[start..end], &out[i]);
+                    }
+                }
+            },
             .One => return deserialize(ptr.child, serialized, out.*),
             else => return error.UnSupportedPointerType,
         },
@@ -320,6 +340,10 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
             // now that their offset is known.
             comptime var last_index = 0;
             inline for (info.Struct.fields) |field| {
+                // comptime fields are currently not supported, and it's not even
+                // certain that they can ever be without a change in the language.
+                if (field.is_comptime) @panic("structure contains comptime field");
+
                 switch (@typeInfo(field.type)) {
                     .Bool, .Int => {}, // covered by the previous pass
                     else => {
