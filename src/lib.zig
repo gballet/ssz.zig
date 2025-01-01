@@ -340,6 +340,10 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
             // now that their offset is known.
             comptime var last_index = 0;
             inline for (info.Struct.fields) |field| {
+                // comptime fields are currently not supported, and it's not even
+                // certain that they can ever be without a change in the language.
+                if (field.is_comptime) @panic("structure contains comptime field");
+
                 switch (@typeInfo(field.type)) {
                     .Bool, .Int => {}, // covered by the previous pass
                     else => {
