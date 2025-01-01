@@ -143,7 +143,7 @@ test "serializes a structure without variable fields" {
     try expect(std.mem.eql(u8, list.items, serialized_data[0..]));
 }
 
-test "serializes a structure with variable fields" {
+test "(de)serializes a structure with variable fields" {
     // Taken from ssz.cr
     const data = .{
         .name = "James",
@@ -156,6 +156,8 @@ test "serializes a structure with variable fields" {
     defer list.deinit();
     try serialize(@TypeOf(data), data, &list);
     try expect(std.mem.eql(u8, list.items, serialized_data[0..]));
+    var out: @TypeOf(data) = undefined;
+    try deserialize(@TypeOf(data), list.items, &out);
 }
 
 test "serializes a structure with optional fields" {
