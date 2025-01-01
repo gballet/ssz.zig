@@ -178,7 +178,7 @@ test "serializes a structure with optional fields" {
     try expect(std.mem.eql(u8, list.items, serialized_data[0..]));
 
     var deserialized: Employee = undefined;
-    try deserialize(Employee, list.items, &deserialized);
+    try deserialize(Employee, list.items, &deserialized, null);
     // only available in >=0.11
     // try std.testing.expectEqualDeep(data, deserialized);
     try expect(std.mem.eql(u8, data.name.?, deserialized.name.?));
@@ -265,7 +265,7 @@ test "(de)serializes a type with a custom serialization method" {
     try expect(list.items.len == 11);
 
     var after: MyCustomSerializingType = undefined;
-    try deserialize(MyCustomSerializingType, list.items, &after);
+    try deserialize(MyCustomSerializingType, list.items, &after, null);
 
     try expect(before.len == after.len);
     try expect(std.mem.eql(u8, before.buffer[0..before.len], after.buffer[0..after.len]));
@@ -274,25 +274,25 @@ test "(de)serializes a type with a custom serialization method" {
 test "deserializes an u8" {
     const payload = [_]u8{0x55};
     var i: u8 = 0;
-    try deserialize(u8, payload[0..payload.len], &i);
+    try deserialize(u8, payload[0..payload.len], &i, null);
     try expect(i == 0x55);
 }
 
 test "deserializes an u32" {
     const payload = [_]u8{ 0x55, 0x66, 0x77, 0x88 };
     var i: u32 = 0;
-    try deserialize(u32, payload[0..payload.len], &i);
+    try deserialize(u32, payload[0..payload.len], &i, null);
     try expect(i == 0x88776655);
 }
 
 test "deserializes a boolean" {
     const payload_false = [_]u8{0};
     var b = true;
-    try deserialize(bool, payload_false[0..1], &b);
+    try deserialize(bool, payload_false[0..1], &b, null);
     try expect(b == false);
 
     const payload_true = [_]u8{1};
-    try deserialize(bool, payload_true[0..1], &b);
+    try deserialize(bool, payload_true[0..1], &b, null);
     try expect(b == true);
 }
 
@@ -300,7 +300,7 @@ test "deserializes a Bitvector[N]" {
     const exp = [_]bool{ true, false, true, true, false, false, false };
     var out = [_]bool{ false, false, false, false, false, false, false };
     const serialized_data = [_]u8{0b00001101};
-    try deserialize([7]bool, serialized_data[0..1], &out);
+    try deserialize([7]bool, serialized_data[0..1], &out, null);
     comptime var i = 0;
     inline while (i < 7) : (i += 1) {
         try expect(out[i] == exp[i]);
@@ -314,14 +314,14 @@ test "deserializes an Optional" {
     var out: ?u32 = undefined;
     const exp: ?u32 = 10;
     try serialize(?u32, exp, &list);
-    try deserialize(?u32, list.items, &out);
+    try deserialize(?u32, list.items, &out, null);
     try expect(out.? == exp.?);
 
     var list2 = ArrayList(u8).init(std.testing.allocator);
     defer list2.deinit();
 
     try serialize(?u32, null, &list2);
-    try deserialize(?u32, list2.items, &out);
+    try deserialize(?u32, list2.items, &out, null);
     try expect(out == null);
 }
 
@@ -334,8 +334,14 @@ test "deserializes a string" {
 
     var got: []const u8 = undefined;
 
-    try deserialize([]const u8, list.items, &got);
+    // deserialize without allocator
+    try deserialize([]const u8, list.items, &got, null);
     try expect(std.mem.eql(u8, exp, got));
+
+    // deserialize with allocator
+    try deserialize([]const u8, list.items, &got, std.testing.allocator);
+    try expect(std.mem.eql(u8, exp, got));
+    std.testing.allocator.free(got);
 }
 
 const Pastry = struct {
@@ -360,7 +366,7 @@ test "deserializes a structure" {
     defer list.deinit();
 
     try serialize(Pastry, pastries[0], &list);
-    try deserialize(Pastry, list.items, &out);
+    try deserialize(Pastry, list.items, &out, null);
 
     try expect(pastries[0].weight == out.weight);
     try expect(std.mem.eql(u8, pastries[0].name, out.name));
@@ -372,7 +378,7 @@ test "deserializes a Vector[N]" {
     defer list.deinit();
 
     try serialize([2]Pastry, pastries, &list);
-    try deserialize(@TypeOf(pastries), list.items, &out);
+    try deserialize(@TypeOf(pastries), list.items, &out, null);
     comptime var i = 0;
     inline while (i < pastries.len) : (i += 1) {
         try expect(out[i].weight == pastries[i].weight);
@@ -386,10 +392,11 @@ test "deserializes an invalid Vector[N] payload" {
     defer list.deinit();
 
     try serialize([2]Pastry, pastries, &list);
-    if (deserialize(@TypeOf(pastries), list.items[0 .. list.items.len / 2], &out)) {
+    if (deserialize(@TypeOf(pastries), list.items[0 .. list.items.len / 2], &out, null)) {
         @panic("missed error");
     } else |err| switch (err) {
         error.IndexOutOfBounds => {},
+        else => @panic(try std.fmt.allocPrint(std.testing.allocator, "wrong type of error found, err={any}", .{err})),
     }
 }
 
@@ -400,13 +407,13 @@ test "deserializes an union" {
     };
 
     var p: Payload = undefined;
-    try deserialize(Payload, ([_]u8{ 1, 1 })[0..], &p);
+    try deserialize(Payload, ([_]u8{ 1, 1 })[0..], &p, null);
     try expect(p.boolean == true);
 
-    try deserialize(Payload, ([_]u8{ 1, 0 })[0..], &p);
+    try deserialize(Payload, ([_]u8{ 1, 0 })[0..], &p, null);
     try expect(p.boolean == false);
 
-    try deserialize(Payload, ([_]u8{ 0, 1, 2, 3, 4 })[0..], &p);
+    try deserialize(Payload, ([_]u8{ 0, 1, 2, 3, 4 })[0..], &p, null);
     try expect(p.int == 0x04030201);
 }
 
@@ -417,7 +424,7 @@ test "serialize/deserialize a u256" {
     var output: [32]u8 = undefined;
 
     try serialize([32]u8, data, &list);
-    try deserialize([32]u8, list.items, &output);
+    try deserialize([32]u8, list.items, &output, null);
 
     try expect(std.mem.eql(u8, data[0..], output[0..]));
 }
@@ -433,7 +440,8 @@ test "(de)serialize a .One pointer in a struct" {
     try serialize(@TypeOf(b), b, &list);
     var c_val: u32 = undefined;
     var c: @TypeOf(b) = .{ .a = &c_val };
-    try deserialize(@TypeOf(b), list.items, &c);
+    try deserialize(@TypeOf(b), list.items, &c, std.testing.allocator);
+    std.testing.allocator.destroy(c.a);
 }
 
 test "chunk count of basic types" {
