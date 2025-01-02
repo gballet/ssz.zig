@@ -210,6 +210,28 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
     }
 }
 
+pub fn deserialize_slice(comptime T: type, serialized: []const u8, out: []T) !void {
+    if (try isFixedSizeObject(T)) {
+        var i: usize = 0;
+        const pitch = @sizeOf(T);
+        while (i < out.len) : (i += pitch) {
+            try deserialize(T, serialized[i * pitch .. (i + 1) * pitch], &out[i]);
+        }
+    } else {
+        const size = std.mem.readInt(u32, serialized[0..4], std.builtin.Endian.little) / @sizeOf(u32);
+        const indices = std.mem.bytesAsSlice(u32, serialized[0 .. size * 4]);
+        var i = @as(usize, 0);
+        while (i < size) : (i += 1) {
+            const end = if (i < size - 1) indices[i + 1] else serialized.len;
+            const start = indices[i];
+            if (start >= serialized.len or end > serialized.len) {
+                return error.IndexOutOfBounds;
+            }
+            try deserialize(T, serialized[start..end], &out[i]);
+        }
+    }
+}
+
 /// Takes a byte array containing the serialized payload of type `T` (with
 /// possible trailing data) and deserializes it into the `T` object pointed
 /// at by `out`.
@@ -278,25 +300,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                 // the responsibility of the caller.
                 out.* = serialized[0..];
             } else {
-                if (try isFixedSizeObject(ptr.child)) {
-                    comptime var i = 0;
-                    const pitch = @sizeOf(ptr.child);
-                    inline while (i < out.len) : (i += pitch) {
-                        try deserialize(ptr.child, serialized[i * pitch .. (i + 1) * pitch], &out[i]);
-                    }
-                } else {
-                    const size = std.mem.readInt(u32, serialized[0..4], std.builtin.Endian.little) / @sizeOf(u32);
-                    const indices = std.mem.bytesAsSlice(u32, serialized[0 .. size * 4]);
-                    var i = @as(usize, 0);
-                    while (i < size) : (i += 1) {
-                        const end = if (i < size - 1) indices[i + 1] else serialized.len;
-                        const start = indices[i];
-                        if (start >= serialized.len or end > serialized.len) {
-                            return error.IndexOutOfBounds;
-                        }
-                        try deserialize(ptr.child, serialized[start..end], &out[i]);
-                    }
-                }
+                try deserialize_slice(ptr.child, serialized, out.*);
             },
             .One => return deserialize(ptr.child, serialized, out.*),
             else => return error.UnSupportedPointerType,
@@ -342,10 +346,15 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
             inline for (info.Struct.fields) |field| {
                 // comptime fields are currently not supported, and it's not even
                 // certain that they can ever be without a change in the language.
-                if (field.is_comptime) @panic("structure contains comptime field");
 
-                switch (@typeInfo(field.type)) {
+                const tinfo = @typeInfo(field.type);
+                switch (tinfo) {
                     .Bool, .Int => {}, // covered by the previous pass
+                    .Pointer => |ptr| switch (ptr.size) {
+                        .One => try deserialize(ptr.child, serialized, @field(out, field.name)),
+                        .Slice => try deserialize_slice(ptr.child, serialized, @field(out.*, field.name)),
+                        else => return error.UnsupportedPointerType,
+                    },
                     else => {
                         const end = if (last_index == indices.len - 1) serialized.len else indices[last_index + 1];
                         try deserialize(field.type, serialized[indices[last_index]..end], &@field(out.*, field.name));

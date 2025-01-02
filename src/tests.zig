@@ -143,17 +143,36 @@ test "serializes a structure without variable fields" {
     try expect(std.mem.eql(u8, list.items, serialized_data[0..]));
 }
 
-test "(de)serializes a structure with variable fields" {
+test "(de)serializes a runtime structure with variable-size fields" {
     // Taken from ssz.cr
     const Person = struct {
-        name: []const u8,
+        name: []u8,
         age: u8,
-        company: []const u8,
+        company: []u8,
     };
     var data = Person{
-        .name = "James",
+        .name = try std.testing.allocator.alloc(u8, 5),
         .age = 32,
-        .company = "DEV Inc.",
+        .company = try std.testing.allocator.alloc(u8, 8),
+    };
+    @memcpy(data.name, "James");
+    @memcpy(data.company, "DEV Inc.");
+    const serialized_data = [_]u8{ 9, 0, 0, 0, 32, 14, 0, 0, 0, 74, 97, 109, 101, 115, 68, 69, 86, 32, 73, 110, 99, 46 };
+
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    // Note the `&data` - this is so that `data` is not considered const.
+    try serialize(@TypeOf(&data), &data, &list);
+    try expect(std.mem.eql(u8, list.items, serialized_data[0..]));
+    var out: @TypeOf(data) = undefined;
+    try deserialize(@TypeOf(data), list.items, &out);
+}
+
+test "(de)serializes a comptime structure with variable-size fields" {
+    // Taken from ssz.cr
+    var data = .{
+        .age = 32,
+        .company = @as([]u8, @constCast("DEV Inc.")),
     };
     const serialized_data = [_]u8{ 9, 0, 0, 0, 32, 14, 0, 0, 0, 74, 97, 109, 101, 115, 68, 69, 86, 32, 73, 110, 99, 46 };
 
@@ -347,17 +366,17 @@ test "deserializes a string" {
 }
 
 const Pastry = struct {
-    name: []const u8,
+    name: []u8,
     weight: u16,
 };
 
 const pastries = [_]Pastry{
     Pastry{
-        .name = "croissant",
+        .name = @as([]u8, @constCast("croissant")),
         .weight = 20,
     },
     Pastry{
-        .name = "Herrentorte",
+        .name = @as([]u8, @constCast("Herrentorte")),
         .weight = 500,
     },
 };
