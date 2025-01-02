@@ -243,7 +243,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
 pub fn deserialize(comptime T: type, serialized: []const u8, out: *T, allocator: ?std.mem.Allocator) !void {
     // shortcut if the type implements its own decode method
     if (comptime std.meta.hasFn(T, "sszDecode")) {
-        return T.sszDecode(serialized, out);
+        return T.sszDecode(serialized, out, allocator);
     }
 
     const info = @typeInfo(T);

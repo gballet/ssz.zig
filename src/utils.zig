@@ -18,7 +18,7 @@ pub fn List(comptime T: type, comptime N: usize) type {
             try serialize([]const Item, self.inner.slice(), l);
         }
 
-        pub fn sszDecode(serialized: []const u8, out: *Self) !void {
+        pub fn sszDecode(serialized: []const u8, out: *Self, allocator: ?std.mem.Allocator) !void {
             // BitList[N] or regular List[N]?
             if (Self.Item == bool) {
                 for (serialized, 0..) |byte, bindex| {
@@ -34,7 +34,7 @@ pub fn List(comptime T: type, comptime N: usize) type {
                 const pitch = @sizeOf(Self.Item);
                 while (i < serialized.len) : (i += pitch) {
                     var item: Self.Item = undefined;
-                    try deserialize(Self.Item, serialized[i .. i + pitch], &item, null);
+                    try deserialize(Self.Item, serialized[i .. i + pitch], &item, allocator);
                     try out.append(item);
                 }
             } else {
@@ -50,7 +50,7 @@ pub fn List(comptime T: type, comptime N: usize) type {
                         return error.IndexOutOfBounds;
                     }
                     const item = try out.inner.addOne();
-                    try deserialize(Self.Item, serialized[start..end], item, null);
+                    try deserialize(Self.Item, serialized[start..end], item, allocator);
                 }
             }
         }

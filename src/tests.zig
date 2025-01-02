@@ -249,7 +249,7 @@ test "(de)serializes a type with a custom serialization method" {
             try list.appendSlice(self.buffer[0..self.len]);
         }
 
-        pub fn sszDecode(serialized: []const u8, out: *Self) !void {
+        pub fn sszDecode(serialized: []const u8, out: *Self, _: ?std.mem.Allocator) !void {
             if (serialized.len == 0) {
                 return error.IndexOutOfBounds;
             }
