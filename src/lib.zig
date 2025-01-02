@@ -213,7 +213,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
 /// Takes a byte array containing the serialized payload of type `T` (with
 /// possible trailing data) and deserializes it into the `T` object pointed
 /// at by `out`.
-pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
+pub fn deserialize(comptime T: type, serialized: []const u8, out: *T, allocator: ?std.mem.Allocator) !void {
     // shortcut if the type implements its own decode method
     if (comptime std.meta.hasFn(T, "sszDecode")) {
         return T.sszDecode(serialized, out);
@@ -238,7 +238,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                     comptime var i = 0;
                     const pitch = @sizeOf(U);
                     inline while (i < out.len) : (i += pitch) {
-                        try deserialize(U, serialized[i * pitch .. (i + 1) * pitch], &out[i]);
+                        try deserialize(U, serialized[i * pitch .. (i + 1) * pitch], &out[i], allocator);
                     }
                 } else {
                     // first variable index is also the size of the list
@@ -252,7 +252,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                         if (start >= serialized.len or end > serialized.len) {
                             return error.IndexOutOfBounds;
                         }
-                        try deserialize(U, serialized[start..end], &out[i]);
+                        try deserialize(U, serialized[start..end], &out[i], allocator);
                     }
                 }
             }
@@ -266,7 +266,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
             const index: u8 = serialized[0];
             if (index != 0) {
                 var x: info.Optional.child = undefined;
-                try deserialize(info.Optional.child, serialized[1..], &x);
+                try deserialize(info.Optional.child, serialized[1..], &x, allocator);
                 out.* = x;
             } else {
                 out.* = null;
@@ -282,7 +282,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                     comptime var i = 0;
                     const pitch = @sizeOf(ptr.child);
                     inline while (i < out.len) : (i += pitch) {
-                        try deserialize(ptr.child, serialized[i * pitch .. (i + 1) * pitch], &out[i]);
+                        try deserialize(ptr.child, serialized[i * pitch .. (i + 1) * pitch], &out[i], allocator);
                     }
                 } else {
                     const size = std.mem.readInt(u32, serialized[0..4], std.builtin.Endian.little) / @sizeOf(u32);
@@ -294,11 +294,16 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                         if (start >= serialized.len or end > serialized.len) {
                             return error.IndexOutOfBounds;
                         }
-                        try deserialize(ptr.child, serialized[start..end], &out[i]);
+                        try deserialize(ptr.child, serialized[start..end], &out[i], allocator);
                     }
                 }
             },
-            .One => return deserialize(ptr.child, serialized, out.*),
+            .One => {
+                if (allocator) |alloc| {
+                    out.* = try alloc.create(ptr.child);
+                }
+                return deserialize(ptr.child, serialized, out.*, allocator);
+            },
             else => return error.UnSupportedPointerType,
         },
         .Struct => {
@@ -325,11 +330,11 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                 switch (@typeInfo(field.type)) {
                     .Bool, .Int => {
                         // Direct deserialize
-                        try deserialize(field.type, serialized[i .. i + @sizeOf(field.type)], &@field(out.*, field.name));
+                        try deserialize(field.type, serialized[i .. i + @sizeOf(field.type)], &@field(out.*, field.name), allocator);
                         i += @sizeOf(field.type);
                     },
                     else => {
-                        try deserialize(u32, serialized[i .. i + 4], &indices[variable_field_index]);
+                        try deserialize(u32, serialized[i .. i + 4], &indices[variable_field_index], allocator);
                         i += 4;
                         variable_field_index += 1;
                     },
@@ -348,7 +353,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                     .Bool, .Int => {}, // covered by the previous pass
                     else => {
                         const end = if (last_index == indices.len - 1) serialized.len else indices[last_index + 1];
-                        try deserialize(field.type, serialized[indices[last_index]..end], &@field(out.*, field.name));
+                        try deserialize(field.type, serialized[indices[last_index]..end], &@field(out.*, field.name), allocator);
                         last_index += 1;
                     },
                 }
@@ -357,7 +362,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
         .Union => {
             // Read the type index
             var union_index: u8 = undefined;
-            try deserialize(u8, serialized, &union_index);
+            try deserialize(u8, serialized, &union_index, allocator);
 
             // Use the index to figure out which type must
             // be deserialized.
@@ -367,7 +372,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T) !void {
                     // because this field type hasn't been activated at this
                     // stage.
                     var data: field.type = undefined;
-                    try deserialize(field.type, serialized[1..], &data);
+                    try deserialize(field.type, serialized[1..], &data, allocator);
                     out.* = @unionInit(T, field.name, data);
                 }
             }
