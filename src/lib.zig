@@ -282,7 +282,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T, allocator:
                     comptime var i = 0;
                     const pitch = @sizeOf(ptr.child);
                     inline while (i < out.len) : (i += pitch) {
-                        try deserialize(ptr.child, serialized[i * pitch .. (i + 1) * pitch], &out[i]);
+                        try deserialize(ptr.child, serialized[i * pitch .. (i + 1) * pitch], &out[i], allocator);
                     }
                 } else {
                     const size = std.mem.readInt(u32, serialized[0..4], std.builtin.Endian.little) / @sizeOf(u32);
@@ -294,11 +294,16 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T, allocator:
                         if (start >= serialized.len or end > serialized.len) {
                             return error.IndexOutOfBounds;
                         }
-                        try deserialize(ptr.child, serialized[start..end], &out[i]);
+                        try deserialize(ptr.child, serialized[start..end], &out[i], allocator);
                     }
                 }
             },
-            .One => return deserialize(ptr.child, serialized, out.*),
+            .One => {
+                if (allocator) |alloc| {
+                    out.* = try alloc.create(ptr.child);
+                }
+                return deserialize(ptr.child, serialized, out.*, allocator);
+            },
             else => return error.UnSupportedPointerType,
         },
         .Struct => {
