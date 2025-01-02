@@ -678,6 +678,6 @@ test "(de)serialize List[N]" {
     defer list.deinit();
     try serialize(ListValidatorIndex, attesting_indices, &list);
     var attesting_indices_deser = try ListValidatorIndex.init(0);
-    try deserialize(ListValidatorIndex, list.items, &attesting_indices_deser);
+    try deserialize(ListValidatorIndex, list.items, &attesting_indices_deser, null);
     try expect(attesting_indices.eql(&attesting_indices_deser));
 }

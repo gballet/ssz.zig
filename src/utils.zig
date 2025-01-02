@@ -34,7 +34,7 @@ pub fn List(comptime T: type, comptime N: usize) type {
                 const pitch = @sizeOf(Self.Item);
                 while (i < serialized.len) : (i += pitch) {
                     var item: Self.Item = undefined;
-                    try deserialize(Self.Item, serialized[i .. i + pitch], &item);
+                    try deserialize(Self.Item, serialized[i .. i + pitch], &item, null);
                     try out.append(item);
                 }
             } else {
@@ -50,7 +50,7 @@ pub fn List(comptime T: type, comptime N: usize) type {
                         return error.IndexOutOfBounds;
                     }
                     const item = try out.inner.addOne();
-                    try deserialize(Self.Item, serialized[start..end], item);
+                    try deserialize(Self.Item, serialized[start..end], item, null);
                 }
             }
         }
