@@ -302,7 +302,14 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T, allocator:
             .Slice => if (@sizeOf(ptr.child) == 1) {
                 // Data is not copied in this function, copy is therefore
                 // the responsibility of the caller.
-                out.* = serialized[0..];
+                if (ptr.is_const) {
+                    out.* = serialized[0..];
+                } else {
+                    if (allocator) |alloc| {
+                        out.* = alloc.alloc(ptr.child, serialized.len);
+                    }
+                    @memcpy(out.*, serialized[0..]);
+                }
             } else {
                 if (try isFixedSizeObject(ptr.child)) {
                     const pitch = try serializedSize(ptr.child, undefined);
