@@ -342,15 +342,16 @@ test "deserializes a string" {
 
     var got: []const u8 = undefined;
 
-    // deserialize without allocator
+    // Deserialize without allocator. The variable
+    // must be of type const.
     try deserialize([]const u8, list.items, &got, null);
     try expect(std.mem.eql(u8, exp, got));
 
     // deserialize with allocator
-    // NOTE uncomment when slices are also allocated
-    // try deserialize([]const u8, list.items, &got, std.testing.allocator);
-    // try expect(std.mem.eql(u8, exp, got));
-    // std.testing.allocator.free(got);
+    var got_var: []u8 = undefined;
+    try deserialize([]u8, list.items, &got_var, std.testing.allocator);
+    defer std.testing.allocator.free(got_var);
+    try expect(std.mem.eql(u8, exp, got));
 }
 
 const Pastry = struct {

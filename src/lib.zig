@@ -306,7 +306,7 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T, allocator:
                     out.* = serialized[0..];
                 } else {
                     if (allocator) |alloc| {
-                        out.* = alloc.alloc(ptr.child, serialized.len);
+                        out.* = try alloc.alloc(ptr.child, serialized.len);
                     }
                     @memcpy(out.*, serialized[0..]);
                 }
