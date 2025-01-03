@@ -311,16 +311,23 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T, allocator:
                         try deserialize(ptr.child, serialized[i * pitch .. (i + 1) * pitch], &out[i], allocator);
                     }
                 } else {
-                    const size = std.mem.readInt(u32, serialized[0..4], std.builtin.Endian.little) / @sizeOf(u32);
-                    const indices = std.mem.bytesAsSlice(u32, serialized[0 .. size * 4]);
-                    var i = @as(usize, 0);
-                    while (i < size) : (i += 1) {
-                        const end = if (i < size - 1) indices[i + 1] else serialized.len;
-                        const start = indices[i];
-                        if (start >= serialized.len or end > serialized.len) {
-                            return error.IndexOutOfBounds;
-                        }
-                        try deserialize(ptr.child, serialized[start..end], &out[i], allocator);
+                    // read the first index, determine when the "variable size" list ends,
+                    // and determine the size of the item as a result.
+                    var offset: usize = 0;
+                    var first_offset: usize = 0;
+                    offset = std.mem.readInt(u32, serialized[0..4], std.builtin.Endian.little);
+                    first_offset = offset;
+                    const n_items = offset / @sizeOf(u32);
+                    var next_offset: usize = if (n_items == 1) serialized.len else std.mem.readInt(u32, serialized[4..8], std.builtin.Endian.little);
+                    if (allocator) |alloc| {
+                        out.* = try alloc.alloc(ptr.child, n_items);
+                    }
+                    for (0..n_items) |i| {
+                        try deserialize(ptr.child, serialized[offset..next_offset], &out.*[i], allocator);
+                        offset = next_offset;
+                        // next offset is either the next entry in the list of offsets,
+                        // or the end of the serialized payload.
+                        next_offset = if ((i + 2) * 4 >= first_offset) serialized.len else std.mem.readInt(u32, serialized[(i + 2) * 4 ..][0..4], std.builtin.Endian.little);
                     }
                 }
             },

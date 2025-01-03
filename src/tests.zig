@@ -454,6 +454,28 @@ test "(de)serialize a .One pointer in a struct" {
     std.testing.allocator.destroy(c.a);
 }
 
+test "(de)serialize a slice of structs" {
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+
+    // force runtime evaluation of the slice using a
+    // runtime start and end.
+    var start: usize = 0;
+    var end: usize = pastries.len;
+    _ = .{ &start, &end };
+
+    try serialize([]Pastry, @constCast(pastries[start..end]), &list);
+
+    // pre-allocated deserialization
+    var deser_const_pastries: [pastries.len]Pastry = undefined;
+    try deserialize([]Pastry, list.items, @constCast(&deser_const_pastries[start..end]), null);
+
+    // allocating deserialization
+    var deser_var_pastries: []Pastry = undefined;
+    try deserialize([]Pastry, list.items, @constCast(&deser_var_pastries), std.testing.allocator);
+    std.testing.allocator.free(deser_var_pastries);
+}
+
 test "chunk count of basic types" {
     try expect(chunkCount(bool) == 1);
     try expect(chunkCount(u8) == 1);
