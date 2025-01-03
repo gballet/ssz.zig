@@ -305,10 +305,13 @@ pub fn deserialize(comptime T: type, serialized: []const u8, out: *T, allocator:
                 out.* = serialized[0..];
             } else {
                 if (try isFixedSizeObject(ptr.child)) {
-                    comptime var i = 0;
-                    const pitch = @sizeOf(ptr.child);
-                    inline while (i < out.len) : (i += pitch) {
-                        try deserialize(ptr.child, serialized[i * pitch .. (i + 1) * pitch], &out[i], allocator);
+                    const pitch = try serializedSize(ptr.child, undefined);
+                    const n_items = serialized.len / pitch;
+                    if (allocator) |alloc| {
+                        out.* = try alloc.alloc(ptr.child, n_items);
+                    }
+                    for (0..n_items) |i| {
+                        try deserialize(ptr.child, serialized[i * pitch .. (i + 1) * pitch], &out.*[i], allocator);
                     }
                 } else {
                     // read the first index, determine when the "variable size" list ends,
