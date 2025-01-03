@@ -31,6 +31,13 @@ fn serializedSize(comptime T: type, data: T) !usize {
         else
             1 + try serializedSize(info.Optional.child, data.?),
         .Null => @as(usize, 0),
+        .Struct => |struc| size: {
+            var size: usize = 0;
+            inline for (struc.fields) |field| {
+                size += try serializedSize(field.type, @field(data, field.name));
+            }
+            break :size size;
+        },
         else => error.NoSerializedSizeAvailable,
     };
 }
