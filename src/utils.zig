@@ -30,11 +30,11 @@ pub fn List(comptime T: type, comptime N: usize) type {
                     }
                 }
             } else if (try isFixedSizeObject(Self.Item)) {
-                var i: usize = 0;
-                const pitch = @sizeOf(Self.Item);
-                while (i < serialized.len) : (i += pitch) {
+                const pitch = try lib.serializedSize(Self.Item, undefined);
+                const n_items = serialized.len / pitch;
+                for (0..n_items) |i| {
                     var item: Self.Item = undefined;
-                    try deserialize(Self.Item, serialized[i .. i + pitch], &item, allocator);
+                    try deserialize(Self.Item, serialized[i * pitch .. (i + 1) * pitch], &item, allocator);
                     try out.append(item);
                 }
             } else {
@@ -55,8 +55,8 @@ pub fn List(comptime T: type, comptime N: usize) type {
             }
         }
 
-        pub fn init(len: usize) error{Overflow}!Self {
-            return .{ .inner = try std.BoundedArray(T, N).init(len) };
+        pub fn init(length: usize) error{Overflow}!Self {
+            return .{ .inner = try std.BoundedArray(T, N).init(length) };
         }
 
         pub fn eql(self: *const Self, other: *Self) bool {
@@ -81,6 +81,10 @@ pub fn List(comptime T: type, comptime N: usize) type {
 
         pub fn set(self: *Self, i: usize, item: T) void {
             self.inner.set(i, item);
+        }
+
+        pub fn len(self: *Self) usize {
+            return self.inner.len;
         }
     };
 }

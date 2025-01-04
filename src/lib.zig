@@ -18,7 +18,7 @@ const BYTES_PER_LENGTH_OFFSET = 4;
 // Determine the serialized size of an object so that
 // the code serializing of variable-size objects can
 // determine the offset to the next object.
-fn serializedSize(comptime T: type, data: T) !usize {
+pub fn serializedSize(comptime T: type, data: T) !usize {
     const info = @typeInfo(T);
     return switch (info) {
         .Int => @sizeOf(T),
