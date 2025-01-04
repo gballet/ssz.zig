@@ -10,9 +10,9 @@ pub fn List(comptime T: type, comptime N: usize) type {
     return struct {
         const Self = @This();
         const Item = T;
-        const Inner = @TypeOf(Self.inner);
+        const Inner = std.BoundedArray(T, N);
 
-        inner: std.BoundedArray(T, N),
+        inner: Inner,
 
         pub fn sszEncode(self: *const Self, l: *ArrayList(u8)) !void {
             try serialize([]const Item, self.inner.slice(), l);

@@ -681,3 +681,15 @@ test "(de)serialize List[N]" {
     try deserialize(ListValidatorIndex, list.items, &attesting_indices_deser, null);
     try expect(attesting_indices.eql(&attesting_indices_deser));
 }
+
+test "List[N].fromSlice of structs" {
+    const PastryList = utils.List(Pastry, 100);
+    var start: usize = 0;
+    var end: usize = pastries.len;
+    _ = .{ &start, &end };
+    const pastry_list = try PastryList.fromSlice(pastries[start..end]);
+    for (pastries, 0..) |pastry, i| {
+        try expect(std.mem.eql(u8, pastry_list.get(i).name, pastry.name));
+        try expect(pastry_list.get(i).weight == pastry.weight);
+    }
+}
