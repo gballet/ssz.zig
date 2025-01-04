@@ -88,3 +88,7 @@ pub fn List(comptime T: type, comptime N: usize) type {
         }
     };
 }
+
+pub fn Bitlist(comptime N: usize) type {
+    return List(bool, N);
+}
