@@ -2,6 +2,7 @@
 //! data structures with the SSZ method.
 
 const std = @import("std");
+pub const utils = @import("./utils.zig");
 const ArrayList = std.ArrayList;
 const builtin = std.builtin;
 const sha256 = std.crypto.hash.sha2.Sha256;
@@ -17,7 +18,7 @@ const BYTES_PER_LENGTH_OFFSET = 4;
 // Determine the serialized size of an object so that
 // the code serializing of variable-size objects can
 // determine the offset to the next object.
-fn serializedSize(comptime T: type, data: T) !usize {
+pub fn serializedSize(comptime T: type, data: T) !usize {
     const info = @typeInfo(T);
     return switch (info) {
         .Int => @sizeOf(T),
@@ -43,7 +44,7 @@ fn serializedSize(comptime T: type, data: T) !usize {
 }
 
 /// Returns true if an object is of fixed size
-fn isFixedSizeObject(comptime T: type) !bool {
+pub fn isFixedSizeObject(comptime T: type) !bool {
     const info = @typeInfo(T);
     switch (info) {
         .Bool, .Int, .Null => return true,
@@ -242,7 +243,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
 pub fn deserialize(comptime T: type, serialized: []const u8, out: *T, allocator: ?std.mem.Allocator) !void {
     // shortcut if the type implements its own decode method
     if (comptime std.meta.hasFn(T, "sszDecode")) {
-        return T.sszDecode(serialized, out);
+        return T.sszDecode(serialized, out, allocator);
     }
 
     const info = @typeInfo(T);

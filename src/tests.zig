@@ -1,4 +1,5 @@
 const libssz = @import("ssz.zig");
+const utils = libssz.utils;
 const serialize = libssz.serialize;
 const deserialize = libssz.deserialize;
 const chunkCount = libssz.chunkCount;
@@ -248,7 +249,7 @@ test "(de)serializes a type with a custom serialization method" {
             try list.appendSlice(self.buffer[0..self.len]);
         }
 
-        pub fn sszDecode(serialized: []const u8, out: *Self) !void {
+        pub fn sszDecode(serialized: []const u8, out: *Self, _: ?std.mem.Allocator) !void {
             if (serialized.len == 0) {
                 return error.IndexOutOfBounds;
             }
@@ -664,4 +665,51 @@ test "calculate the root hash of an union" {
     sha256.hash(payload[0..], exp2[0..], sha256.Options{});
     try hashTreeRoot(Payload, Payload{ .boolean = true }, &out, std.testing.allocator);
     try expect(std.mem.eql(u8, out[0..], exp2[0..]));
+}
+
+test "(de)serialize List[N] of fixed-length objects" {
+    const MAX_VALIDATORS_PER_COMMITTEE: usize = 2048;
+    const ListValidatorIndex = utils.List(u64, MAX_VALIDATORS_PER_COMMITTEE);
+    var attesting_indices = try ListValidatorIndex.init(0);
+    for (0..10) |i| {
+        try attesting_indices.append(i * 100);
+    }
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    try serialize(ListValidatorIndex, attesting_indices, &list);
+    var attesting_indices_deser = try ListValidatorIndex.init(0);
+    try deserialize(ListValidatorIndex, list.items, &attesting_indices_deser, null);
+    try expect(attesting_indices.eql(&attesting_indices_deser));
+}
+
+test "(de)serialize List[N] of variable-length objects" {
+    const ListOfStrings = utils.List([]const u8, 16);
+    var string_list = try ListOfStrings.init(0);
+    for (0..10) |i| {
+        try string_list.append(try std.fmt.allocPrint(std.testing.allocator, "count={}", .{i}));
+    }
+    defer for (0..string_list.len()) |i| {
+        std.testing.allocator.free(string_list.get(i));
+    };
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    try serialize(ListOfStrings, string_list, &list);
+    var string_list_deser = try ListOfStrings.init(0);
+    try deserialize(ListOfStrings, list.items, &string_list_deser, null);
+    try expect(string_list.len() == string_list_deser.len());
+    for (0..string_list.len()) |i| {
+        try expect(std.mem.eql(u8, string_list.get(i), string_list_deser.get(i)));
+    }
+}
+
+test "List[N].fromSlice of structs" {
+    const PastryList = utils.List(Pastry, 100);
+    var start: usize = 0;
+    var end: usize = pastries.len;
+    _ = .{ &start, &end };
+    const pastry_list = try PastryList.fromSlice(pastries[start..end]);
+    for (pastries, 0..) |pastry, i| {
+        try expect(std.mem.eql(u8, pastry_list.get(i).name, pastry.name));
+        try expect(pastry_list.get(i).weight == pastry.weight);
+    }
 }
