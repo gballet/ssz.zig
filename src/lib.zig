@@ -138,6 +138,9 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
             // Bitlist[N] or list?
             switch (info.Pointer.size) {
                 .Slice => {
+                    if (info.Pointer.child == bool) {
+                        @panic("use util.Bitlist instead of []bool");
+                    }
                     if (@sizeOf(info.Pointer.child) == 1) {
                         _ = try l.writer().write(data);
                     } else {
