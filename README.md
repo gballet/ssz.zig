@@ -20,6 +20,7 @@ Currently supported types:
  * `Vector[N]`
  * **tagged** unions
  * `List[N]`
+ * `Bitlist[N]`
 
 Ziglang has the limitation that it's not possible to determine which union field is active without tags.
 
@@ -40,6 +41,7 @@ Supported types:
  * unions
  * optionals
  * `List[N]`
+ * `Bitlist[N]`
 
 ## Merkelization (experimental)
 
@@ -55,6 +57,8 @@ Supported types:
  * strings
  * optionals
  * unions
+ * `List[N]`
+ * `Bitlist[N]`
 
 ## Contributing
 
