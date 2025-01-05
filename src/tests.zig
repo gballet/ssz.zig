@@ -713,3 +713,18 @@ test "List[N].fromSlice of structs" {
         try expect(pastry_list.get(i).weight == pastry.weight);
     }
 }
+
+test "(de)serialization of Bitlist[N]" {
+    var bitlist = try utils.Bitlist(10).init(0);
+    try bitlist.append(true);
+    try bitlist.append(false);
+    try bitlist.append(true);
+    try expect(bitlist.get(1) == false);
+    try expect(bitlist.get(2) == true);
+
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    try serialize(@TypeOf(bitlist), bitlist, &list);
+    var bitlist_deser: @TypeOf(bitlist) = undefined;
+    try deserialize(@TypeOf(bitlist), list.items, &bitlist_deser, null);
+}

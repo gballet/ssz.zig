@@ -21,14 +21,7 @@ pub fn List(comptime T: type, comptime N: usize) type {
         pub fn sszDecode(serialized: []const u8, out: *Self, allocator: ?std.mem.Allocator) !void {
             // BitList[N] or regular List[N]?
             if (Self.Item == bool) {
-                for (serialized, 0..) |byte, bindex| {
-                    var i = @as(u8, 0);
-                    var b = byte;
-                    while (bindex * 8 + i < out.len and i < 8) : (i += 1) {
-                        out[bindex * 8 + i] = b & 1 == 1;
-                        b >>= 1;
-                    }
-                }
+                @panic("Use the optimized utils.Bitlist(N) instead of utils.List(bool, N)");
             } else if (try isFixedSizeObject(Self.Item)) {
                 const pitch = try lib.serializedSize(Self.Item, undefined);
                 const n_items = serialized.len / pitch;
@@ -56,7 +49,7 @@ pub fn List(comptime T: type, comptime N: usize) type {
         }
 
         pub fn init(length: usize) error{Overflow}!Self {
-            return .{ .inner = try std.BoundedArray(T, N).init(length) };
+            return .{ .inner = try Inner.init(length) };
         }
 
         pub fn eql(self: *const Self, other: *Self) bool {
@@ -89,6 +82,56 @@ pub fn List(comptime T: type, comptime N: usize) type {
     };
 }
 
+/// Implements the SSZ `Bitlist[N]` container
 pub fn Bitlist(comptime N: usize) type {
-    return List(bool, N);
+    return struct {
+        const Self = @This();
+        const Inner = std.BoundedArray(u8, (N + 7) / 8);
+
+        inner: Inner,
+        len: usize,
+
+        pub fn sszEncode(self: *const Self, l: *ArrayList(u8)) !void {
+            try serialize([]const u8, self.inner.slice(), l);
+        }
+
+        pub fn sszDecode(serialized: []const u8, out: *Self, _: ?std.mem.Allocator) !void {
+            out.* = try init(0);
+            for (serialized, 0..) |byte, bindex| {
+                var i = @as(u8, 0);
+                var b = byte;
+                while (bindex * 8 + i < out.len and i < 8) : (i += 1) {
+                    try out.*.append(b & 1 == 1);
+                    b >>= 1;
+                }
+            }
+        }
+
+        pub fn init(length: usize) error{Overflow}!Self {
+            return .{ .inner = try Inner.init((length + 7) / 8), .len = length };
+        }
+
+        pub fn get(self: Self, i: usize) bool {
+            if (i >= self.len) {
+                var buf: [1024]u8 = undefined;
+                const str = std.fmt.bufPrint(&buf, "out of bounds: want index {}, len {}", .{ i, self.len }) catch unreachable;
+                @panic(str);
+            }
+            return self.inner.get(i / 8) & @shlExact(@as(u8, 1), @truncate(i % 8)) != 0;
+        }
+
+        pub fn set(self: *Self, i: usize, bit: bool) void {
+            const mask = ~@shlExact(@as(u8, 1), @truncate(i % 8));
+            const b = if (bit) @shlExact(@as(u8, 1), @truncate(i % 8)) else 0;
+            self.inner.set(i / 8, @truncate((self.inner.get(i / 8) & mask) | b));
+        }
+
+        pub fn append(self: *Self, item: bool) error{Overflow}!void {
+            if (self.len % 8 == 7 or self.len == 0) {
+                try self.inner.append(0);
+            }
+            self.len += 1;
+            self.set(self.len - 1, item);
+        }
+    };
 }
