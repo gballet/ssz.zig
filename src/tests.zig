@@ -728,3 +728,20 @@ test "(de)serialization of Bitlist[N]" {
     var bitlist_deser: @TypeOf(bitlist) = undefined;
     try deserialize(@TypeOf(bitlist), list.items, &bitlist_deser, null);
 }
+
+test "(de)serialization of Bitlist[N] when N % 8 != 0" {
+    var bitlist = try utils.Bitlist(3).init(0);
+    try bitlist.append(true);
+    try bitlist.append(false);
+    try bitlist.append(true);
+    try expect(bitlist.get(1) == false);
+    try expect(bitlist.get(2) == true);
+
+    var list = ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    try serialize(@TypeOf(bitlist), bitlist, &list);
+    var bitlist_deser: @TypeOf(bitlist) = undefined;
+    try deserialize(@TypeOf(bitlist), list.items, &bitlist_deser, null);
+    try expect(bitlist.len() == bitlist_deser.len());
+    try expect(bitlist.eql(&bitlist_deser));
+}

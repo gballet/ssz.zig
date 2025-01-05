@@ -89,32 +89,59 @@ pub fn Bitlist(comptime N: usize) type {
         const Inner = std.BoundedArray(u8, (N + 7) / 8);
 
         inner: Inner,
-        len: usize,
+        length: usize,
 
         pub fn sszEncode(self: *const Self, l: *ArrayList(u8)) !void {
-            try serialize([]const u8, self.inner.slice(), l);
+            if (self.length == 0) {
+                return;
+            }
+
+            // slice has at least one byte, appends all
+            // non-terminal bytes.
+            const slice = self.inner.constSlice();
+            try l.appendSlice(slice[0 .. slice.len - 1]);
+
+            try l.append(slice[slice.len - 1] | @shlExact(@as(u8, 1), @truncate(self.length % 8)));
         }
 
         pub fn sszDecode(serialized: []const u8, out: *Self, _: ?std.mem.Allocator) !void {
             out.* = try init(0);
-            for (serialized, 0..) |byte, bindex| {
-                var i = @as(u8, 0);
-                var b = byte;
-                while (bindex * 8 + i < out.len and i < 8) : (i += 1) {
-                    try out.*.append(b & 1 == 1);
-                    b >>= 1;
-                }
+            if (serialized.len == 0) {
+                return;
+            }
+
+            // determine where the last bit is
+            const byte_len = serialized.len - 1;
+            var last_byte = serialized[byte_len];
+            var bit_len: usize = 8;
+            if (last_byte == 0) {
+                return error.InvalidEncoding;
+            }
+            while (last_byte & @shlExact(@as(usize, 1), @truncate(bit_len)) == 0) : (bit_len -= 1) {}
+            if (bit_len + 8 * byte_len > N) {
+                return error.InvalidEncoding;
+            }
+
+            // insert all full bytes
+            try out.*.inner.insertSlice(0, serialized[0..byte_len]);
+            out.*.length = 8 * byte_len;
+
+            // insert last bits
+            last_byte = serialized[byte_len];
+            for (0..bit_len) |_| {
+                try out.*.append(last_byte & 1 == 1);
+                last_byte >>= 1;
             }
         }
 
         pub fn init(length: usize) error{Overflow}!Self {
-            return .{ .inner = try Inner.init((length + 7) / 8), .len = length };
+            return .{ .inner = try Inner.init((length + 7) / 8), .length = length };
         }
 
         pub fn get(self: Self, i: usize) bool {
-            if (i >= self.len) {
+            if (i >= self.length) {
                 var buf: [1024]u8 = undefined;
-                const str = std.fmt.bufPrint(&buf, "out of bounds: want index {}, len {}", .{ i, self.len }) catch unreachable;
+                const str = std.fmt.bufPrint(&buf, "out of bounds: want index {}, len {}", .{ i, self.length }) catch unreachable;
                 @panic(str);
             }
             return self.inner.get(i / 8) & @shlExact(@as(u8, 1), @truncate(i % 8)) != 0;
@@ -127,11 +154,19 @@ pub fn Bitlist(comptime N: usize) type {
         }
 
         pub fn append(self: *Self, item: bool) error{Overflow}!void {
-            if (self.len % 8 == 7 or self.len == 0) {
+            if (self.length % 8 == 7 or self.length == 0) {
                 try self.inner.append(0);
             }
-            self.len += 1;
-            self.set(self.len - 1, item);
+            self.length += 1;
+            self.set(self.length - 1, item);
+        }
+
+        pub fn len(self: *Self) usize {
+            return if (self.length > N) N else self.length;
+        }
+
+        pub fn eql(self: *const Self, other: *Self) bool {
+            return (self.length == other.length) and std.mem.eql(u8, self.inner.constSlice()[0..self.inner.len], other.inner.constSlice()[0..other.inner.len]);
         }
     };
 }
