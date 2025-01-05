@@ -78,7 +78,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                 var byte: u8 = 0;
                 for (data, 0..) |bit, index| {
                     if (bit) {
-                        byte |= @as(u8, 1) << @as(u3, @truncate(index));
+                        byte |= @as(u8, 1) << @truncate(index);
                     }
 
                     if (index % 8 == 7) {
@@ -113,7 +113,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                     // Now serialize one item after the other
                     // and update the offset list with its location.
                     for (data) |item| {
-                        std.mem.writeInt(u32, l.items[start .. start + 4][0..4], @as(u32, @truncate(l.items.len)), std.builtin.Endian.little);
+                        std.mem.writeInt(u32, l.items[start .. start + 4][0..4], @truncate(l.items.len), std.builtin.Endian.little);
                         _ = try serialize(info.Array.child, item, l);
                         start += 4;
                     }
@@ -158,7 +158,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                             // Now serialize one item after the other
                             // and update the offset list with its location.
                             for (data) |item| {
-                                std.mem.writeInt(u32, l.items[start .. start + 4][0..4], @as(u32, @truncate(l.items.len)), std.builtin.Endian.little);
+                                std.mem.writeInt(u32, l.items[start .. start + 4][0..4], @truncate(l.items.len), std.builtin.Endian.little);
                                 _ = try serialize(info.Pointer.child, item, l);
                                 start += 4;
                             }
@@ -188,7 +188,7 @@ pub fn serialize(comptime T: type, data: T, l: *ArrayList(u8)) !void {
                         try serialize(field.type, @field(data, field.name), l);
                     },
                     else => {
-                        try serialize(u32, @as(u32, @truncate(var_acc)), l);
+                        try serialize(u32, @truncate(var_acc), l);
                         var_acc += try serializedSize(field.type, @field(data, field.name));
                     },
                 }
@@ -659,7 +659,7 @@ fn packBits(bits: []const bool, l: *ArrayList(u8)) ![]chunk {
     var byte: u8 = 0;
     for (bits, 0..) |bit, bitidx| {
         if (bit) {
-            byte |= @as(u8, 1) << @as(u3, @truncate(7 - bitidx % 8));
+            byte |= @as(u8, 1) << @truncate(7 - bitidx % 8);
         }
         if (bitidx % 8 == 7 or bitidx == bits.len - 1) {
             try l.append(byte);
